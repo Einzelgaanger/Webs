@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle2, Key, UserCheck, BookOpen, Info, ArrowLeft } from "lucide-react";
+import { 
+  AlertCircle, CheckCircle2, Key, UserCheck, BookOpen, Info, ArrowLeft, 
+  Eye, EyeOff, User, BookText, Award, GraduationCap 
+} from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Redirect } from "wouter";
+import { motion } from "framer-motion";
 
 const loginSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -35,6 +39,22 @@ export default function AuthPage() {
   const [activeTab, setActiveTab] = useState<string>("login");
   const [resetSuccess, setResetSuccess] = useState<boolean>(false);
   const [showOnboarding, setShowOnboarding] = useState<boolean>(true);
+  
+  // Password visibility states
+  const [showLoginPassword, setShowLoginPassword] = useState<boolean>(false);
+  const [showSecretKey, setShowSecretKey] = useState<boolean>(false);
+  
+  // Animation states for onboarding
+  const [animationComplete, setAnimationComplete] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Auto-complete animation after 1 second to ensure UI is responsive
+    const timer = setTimeout(() => {
+      setAnimationComplete(true);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   // Set up form with more flexible login
   const loginForm = useForm<LoginFormValues>({
@@ -92,58 +112,105 @@ export default function AuthPage() {
     return <Redirect to="/" />;
   }
 
-  // Playful onboarding UI
+  // Enhanced animated onboarding UI
   if (showOnboarding) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-100 to-indigo-100">
-        <Card className="w-full max-w-lg mx-auto">
-          <CardHeader className="text-center">
-            <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="h-10 w-10 text-primary" />
-            </div>
-            <CardTitle className="text-3xl bg-gradient-to-r from-blue-600 to-indigo-500 text-transparent bg-clip-text">
-              Welcome to SDS Year 2 Portal
-            </CardTitle>
-            <CardDescription className="text-lg mt-2">
-              Your hub for academic excellence
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex flex-col items-center text-center space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/10">
-                <UserCheck className="h-8 w-8 text-green-500" />
-                <h3 className="font-medium">Easy Access</h3>
-                <p className="text-sm text-muted-foreground">Sign in with your name and admission number</p>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-400 to-indigo-600">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Card className="w-full max-w-lg mx-auto shadow-xl border-0">
+            <CardHeader className="text-center bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg">
+              <motion.div 
+                className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4"
+                initial={{ scale: 0.8, rotate: -10 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+              >
+                <GraduationCap className="h-12 w-12 text-white" />
+              </motion.div>
+              <CardTitle className="text-3xl font-bold tracking-tight">
+                Welcome to SDS Year 2 Portal
+              </CardTitle>
+              <CardDescription className="text-lg mt-2 text-blue-100">
+                Your hub for academic excellence
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {[
+                  {
+                    icon: <User className="h-8 w-8 text-green-500" />,
+                    title: "Easy Access",
+                    description: "Sign in with your name and admission number",
+                    color: "bg-green-50 border-green-100",
+                    delay: 0.3
+                  },
+                  {
+                    icon: <BookText className="h-8 w-8 text-blue-500" />,
+                    title: "Course Materials",
+                    description: "Access notes, assignments, and past papers",
+                    color: "bg-blue-50 border-blue-100",
+                    delay: 0.4
+                  },
+                  {
+                    icon: <Award className="h-8 w-8 text-purple-500" />,
+                    title: "Track Progress",
+                    description: "Monitor your performance and rankings",
+                    color: "bg-purple-50 border-purple-100",
+                    delay: 0.5
+                  }
+                ].map((item, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: item.delay, duration: 0.4 }}
+                    className={`flex flex-col items-center text-center space-y-2 p-4 rounded-lg ${item.color} border shadow-sm`}
+                  >
+                    {item.icon}
+                    <h3 className="font-medium">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </motion.div>
+                ))}
               </div>
-              <div className="flex flex-col items-center text-center space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/10">
-                <BookOpen className="h-8 w-8 text-blue-500" />
-                <h3 className="font-medium">Course Materials</h3>
-                <p className="text-sm text-muted-foreground">Access notes, assignments, and past papers</p>
-              </div>
-              <div className="flex flex-col items-center text-center space-y-2 p-4 rounded-lg bg-primary/5 border border-primary/10">
-                <Info className="h-8 w-8 text-indigo-500" />
-                <h3 className="font-medium">Track Progress</h3>
-                <p className="text-sm text-muted-foreground">Monitor your performance and rankings</p>
-              </div>
-            </div>
-            
-            <Alert className="bg-amber-50 border-amber-200">
-              <AlertCircle className="h-4 w-4 text-amber-500" />
-              <AlertTitle className="text-amber-700">Login Tip</AlertTitle>
-              <AlertDescription className="text-amber-600">
-                Use your full name, admission number, and default password: <strong>sds#website</strong>
-              </AlertDescription>
-            </Alert>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              className="w-full" 
-              onClick={() => setShowOnboarding(false)}
-            >
-              Get Started
-            </Button>
-          </CardFooter>
-        </Card>
+              
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6, duration: 0.4 }}
+              >
+                <Alert className="bg-amber-50 border border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <AlertTitle className="text-amber-800 font-medium">Important Login Tip</AlertTitle>
+                  <AlertDescription className="text-amber-700">
+                    If your name in the class register is <strong>Max, James Bond</strong>, use <strong>James Bond</strong> as your name.
+                    <br />
+                    Default password: <strong>sds#website</strong> — change it immediately after first login.
+                  </AlertDescription>
+                </Alert>
+              </motion.div>
+            </CardContent>
+            <CardFooter>
+              <motion.div 
+                className="w-full" 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.7, duration: 0.3 }}
+              >
+                <Button 
+                  className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white" 
+                  size="lg"
+                  onClick={() => setShowOnboarding(false)}
+                >
+                  Get Started
+                </Button>
+              </motion.div>
+            </CardFooter>
+          </Card>
+        </motion.div>
       </div>
     );
   }
@@ -197,9 +264,31 @@ export default function AuthPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Password</FormLabel>
-                        <FormControl>
-                          <Input type="password" placeholder="Enter password" {...field} />
-                        </FormControl>
+                        <div className="relative">
+                          <FormControl>
+                            <Input 
+                              type={showLoginPassword ? "text" : "password"} 
+                              placeholder="Enter password" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          >
+                            {showLoginPassword ? (
+                              <EyeOff className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <Eye className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span className="sr-only">
+                              {showLoginPassword ? "Hide password" : "Show password"}
+                            </span>
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground mt-1">Default password: sds#website</p>
                         <FormMessage />
                       </FormItem>
@@ -281,15 +370,33 @@ export default function AuthPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Administrator Secret Key</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password" 
-                              placeholder="Enter the secret key provided by admin" 
-                              {...field} 
-                            />
-                          </FormControl>
+                          <div className="relative">
+                            <FormControl>
+                              <Input 
+                                type={showSecretKey ? "text" : "password"} 
+                                placeholder="Enter the secret key provided by admin" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                              onClick={() => setShowSecretKey(!showSecretKey)}
+                            >
+                              {showSecretKey ? (
+                                <EyeOff className="h-4 w-4 text-muted-foreground" />
+                              ) : (
+                                <Eye className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className="sr-only">
+                                {showSecretKey ? "Hide secret key" : "Show secret key"}
+                              </span>
+                            </Button>
+                          </div>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Contact the administrator for this secret key
+                            The default reset key is <strong>reset123</strong>
                           </p>
                           <FormMessage />
                         </FormItem>

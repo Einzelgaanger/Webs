@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Eye, EyeOff } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -21,6 +23,11 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 export default function PasswordForm() {
   const { updatePasswordMutation } = useAuth();
+  
+  // Password visibility toggle states
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -50,13 +57,31 @@ export default function PasswordForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Current Password</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="password" 
-                    placeholder="Enter current password" 
-                    {...field} 
-                  />
-                </FormControl>
+                <div className="relative">
+                  <FormControl>
+                    <Input 
+                      type={showCurrentPassword ? "text" : "password"}
+                      placeholder="Enter current password" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="sr-only">
+                      {showCurrentPassword ? "Hide password" : "Show password"}
+                    </span>
+                  </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -68,13 +93,31 @@ export default function PasswordForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>New Password</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="password" 
-                    placeholder="Enter new password" 
-                    {...field} 
-                  />
-                </FormControl>
+                <div className="relative">
+                  <FormControl>
+                    <Input 
+                      type={showNewPassword ? "text" : "password"}
+                      placeholder="Enter new password" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="sr-only">
+                      {showNewPassword ? "Hide password" : "Show password"}
+                    </span>
+                  </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -86,13 +129,31 @@ export default function PasswordForm() {
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Confirm New Password</FormLabel>
-                <FormControl>
-                  <Input 
-                    type="password" 
-                    placeholder="Confirm new password" 
-                    {...field} 
-                  />
-                </FormControl>
+                <div className="relative">
+                  <FormControl>
+                    <Input 
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm new password" 
+                      {...field} 
+                    />
+                  </FormControl>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <span className="sr-only">
+                      {showConfirmPassword ? "Hide password" : "Show password"}
+                    </span>
+                  </Button>
+                </div>
                 <FormMessage />
               </FormItem>
             )}

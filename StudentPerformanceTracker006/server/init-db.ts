@@ -25,9 +25,20 @@ async function hashPassword(password: string) {
 export async function initializeDatabase() {
   log("Initializing database...", "db-init");
   
-  // Create a separate connection for database initialization
+  // Create a separate connection for database initialization with enhanced SSL configuration
   const connectionString = process.env.DATABASE_URL!;
-  const client = postgres(connectionString);
+  log(`Connecting to database: ${connectionString.split('@')[1] || 'hidden-for-security'}`, "db-init");
+  
+  // More robust connection with error handling and SSL support
+  const client = postgres(connectionString, {
+    ssl: {
+      rejectUnauthorized: false // Required for Replit hosted databases
+    },
+    idle_timeout: 20,
+    connect_timeout: 30,
+    max: 5 // Fewer connections for initialization
+  });
+  
   const db = drizzle(client, {});
   
   try {

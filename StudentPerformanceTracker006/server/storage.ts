@@ -73,16 +73,40 @@ export class DatabaseStorage implements IStorage {
   sessionStore: session.Store;
   
   constructor() {
-    // Create a PostgreSQL connection pool for the session store
+    // Create a PostgreSQL connection pool for the session store with enhanced configuration
     const pool = new pg.Pool({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // Required for Replit PostgreSQL
+      },
+      max: 20, // Maximum number of clients in the pool
+      idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
+      connectionTimeoutMillis: 10000, // How long to wait for a connection
+      query_timeout: 10000 // How long a query can run before timing out
     });
     
-    // Initialize session store with PostgreSQL
-    this.sessionStore = new PostgresStore({
-      pool,
-      createTableIfMissing: true
+    // Add error handling for the connection pool
+    pool.on('error', (err) => {
+      console.error('Unexpected error on idle PostgreSQL client', err);
     });
+    
+    // For debugging purposes
+    console.log('Creating PostgreSQL connection pool for session store');
+    
+    try {
+      // Initialize session store with PostgreSQL and better error handling
+      this.sessionStore = new PostgresStore({
+        pool,
+        createTableIfMissing: true,
+        tableName: 'session', // Explicitly name the table
+        schemaName: 'public',
+        pruneSessionInterval: 60 * 15 // Prune expired sessions every 15 minutes
+      });
+      console.log('Successfully created PostgreSQL session store');
+    } catch (err) {
+      console.error('Failed to create PostgreSQL session store:', err);
+      throw err; // Re-throw to fail app startup if the session store can't be created
+    }
     
     // Make sure uploads directory exists
     this.initializeStorage();
