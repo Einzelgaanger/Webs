@@ -135,46 +135,91 @@ export class DatabaseStorage implements IStorage {
   
   async getUserByCredentials(name: string, admissionNumber: string): Promise<User | undefined> {
     try {
-      // First try exact match (case-sensitive)
+      console.log(`🔍 Looking for user with name: "${name}", admission: "${admissionNumber}"`);
+      
+      // Normalize inputs - trim whitespace and clean up
+      const normalizedName = name.trim();
+      const normalizedAdmission = admissionNumber.trim();
+      
+      if (!normalizedName || !normalizedAdmission) {
+        console.log('⚠️ Name or admission number is empty after normalization');
+        return undefined;
+      }
+      
+      // Strategy 1: Try exact match first (case-sensitive)
       let [user] = await db.select()
         .from(users)
         .where(
           and(
-            eq(users.name, name),
-            eq(users.admissionNumber, admissionNumber)
+            eq(users.name, normalizedName),
+            eq(users.admissionNumber, normalizedAdmission)
           )
         );
 
-      if (user) return user;
+      if (user) {
+        console.log(`✅ Found exact match for user: ${user.name} (ID: ${user.id})`);
+        return user;
+      }
 
       // If no match, try with more flexible approach
-      console.log(`No exact match found, doing flexible search for ${name}, ${admissionNumber}`);
+      console.log(`ℹ️ No exact match found, doing flexible search for "${normalizedName}", "${normalizedAdmission}"`);
       
       // Get all users and do case-insensitive comparison
       const allUsers = await db.select().from(users);
-      console.log(`Total users in database: ${allUsers.length}`);
+      console.log(`📊 Total users in database: ${allUsers.length}`);
       
-      // Log the first few users for debugging
-      if (allUsers.length > 0) {
-        console.log(`USERS IN DATABASE: ${allUsers.length} users found`);
-        console.log(`FIRST USER: ${JSON.stringify(allUsers[0])}`);
+      // Log all users for debugging (in development only)
+      if (process.env.NODE_ENV !== 'production' && allUsers.length > 0) {
+        console.log('📜 Users in database:');
+        allUsers.forEach((u, i) => {
+          console.log(`   [${i+1}] "${u.name}" (${u.admissionNumber})`);
+        });
       }
       
-      // Find a match using case-insensitive string comparison
+      // Strategy 2: Case-insensitive exact match
       user = allUsers.find(u => 
-        u.name.toLowerCase() === name.toLowerCase() && 
-        u.admissionNumber.toLowerCase() === admissionNumber.toLowerCase()
+        u.name.toLowerCase().trim() === normalizedName.toLowerCase() && 
+        u.admissionNumber.toLowerCase().trim() === normalizedAdmission.toLowerCase()
       );
       
       if (user) {
-        console.log(`Found user with flexible matching: ${user.name} (ID: ${user.id})`);
-      } else {
-        console.log(`No user found with name "${name}" and admission "${admissionNumber}"`);
+        console.log(`✅ Found user via case-insensitive match: ${user.name} (ID: ${user.id})`);
+        return user;
       }
       
-      return user;
+      // Strategy 3: Match by admission number only (if admissions are unique)
+      user = allUsers.find(u => 
+        u.admissionNumber.toLowerCase().trim() === normalizedAdmission.toLowerCase()
+      );
+      
+      if (user) {
+        console.log(`✅ Found user by admission number only: ${user.name} (ID: ${user.id})`);
+        return user;
+      }
+      
+      // Strategy 4: Partial/fuzzy matching - does the name contain the input or vice versa
+      user = allUsers.find(u => {
+        const dbName = u.name.toLowerCase().trim();
+        const inputName = normalizedName.toLowerCase();
+        const dbAdmission = u.admissionNumber.toLowerCase().trim();
+        const inputAdmission = normalizedAdmission.toLowerCase();
+        
+        // Check if either contains the other
+        const nameMatch = dbName.includes(inputName) || inputName.includes(dbName);
+        const admissionMatch = dbAdmission.includes(inputAdmission) || inputAdmission.includes(dbAdmission);
+        
+        return nameMatch && admissionMatch;
+      });
+      
+      if (user) {
+        console.log(`✅ Found user via fuzzy matching: ${user.name} (ID: ${user.id})`);
+        return user;
+      }
+      
+      console.log(`❌ No user found with name "${normalizedName}" and admission "${normalizedAdmission}"`);
+      return undefined;
     } catch (error) {
-      console.error("Error getting user by credentials:", error);
+      console.error("❌ Error getting user by credentials:", error);
       return undefined;
     }
   }

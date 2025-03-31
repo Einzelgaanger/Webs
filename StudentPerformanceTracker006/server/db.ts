@@ -45,8 +45,13 @@ const connectionOptions = {
 // Create postgres client with better error handling
 let client;
 try {
-  // Use environment variable with fallback
-  client = postgres(DATABASE_URL || 'postgres://postgres:postgress@localhost:5432/class_project', connectionOptions);
+  // Only use the DATABASE_URL from environment variable - no fallbacks
+  if (!DATABASE_URL) {
+    console.error('❌ DATABASE CRITICAL ERROR: DATABASE_URL environment variable is not set');
+    throw new Error('Database configuration error: Missing DATABASE_URL environment variable');
+  }
+  
+  client = postgres(DATABASE_URL, connectionOptions);
   console.log('📊 DATABASE: Postgres client initialized successfully');
 } catch (error) {
   console.error('❌ DATABASE CRITICAL ERROR: Failed to initialize Postgres client:', error);
