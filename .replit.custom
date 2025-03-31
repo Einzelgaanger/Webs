@@ -1,4 +1,7 @@
-modules = ["nodejs-20"]
+run = "cd StudentPerformanceTracker006 && node app.cjs"
+
+[env]
+PORT = "3000"
 
 [nix]
 channel = "stable-24_05"

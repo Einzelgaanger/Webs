@@ -25,7 +25,7 @@
     "multer": "^1.4.5-lts.2",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
-    "path-to-regexp": "^6.3.0",
+    "path-to-regexp": "^6.2.1",
     "pg": "^8.14.1",
     "postgres": "^3.4.5",
     "react": "^19.1.0",

@@ -1,0 +1,4 @@
+[workflow.StudentTrackerApp]
+name = "Student Tracker App"
+description = "Student Performance Tracker Application"
+run = "node StudentPerformanceTracker006/app.cjs"

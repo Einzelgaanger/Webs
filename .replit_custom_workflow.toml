@@ -1,0 +1,3 @@
+[studenttracker]
+command = "cd StudentPerformanceTracker006 && node app.cjs"
+inContextTimeout = 120

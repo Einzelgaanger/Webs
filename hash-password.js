@@ -1,16 +1,33 @@
 const crypto = require('crypto');
-const { promisify } = require('util');
+const readline = require('readline');
 
 async function hashPassword(password) {
-  const scryptAsync = promisify(crypto.scrypt);
   const salt = crypto.randomBytes(16).toString('hex');
-  const buf = await scryptAsync(password, salt, 64);
-  return `${buf.toString('hex')}.${salt}`;
+  const hash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
 }
 
 async function main() {
-  const hashedPassword = await hashPassword('sds#website');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  const password = await new Promise(resolve => {
+    rl.question('Enter password to hash: ', answer => {
+      resolve(answer);
+    });
+  });
+
+  const hashedPassword = await hashPassword(password);
+  console.log('\nHashed password:');
   console.log(hashedPassword);
+
+  rl.close();
 }
 
-main();
+// Run the main function
+main().catch(err => {
+  console.error('Error:', err);
+  process.exit(1);
+});

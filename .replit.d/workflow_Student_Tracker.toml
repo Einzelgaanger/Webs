@@ -1,0 +1,4 @@
+[workflow.Student_Tracker]
+name = "Student Tracker"
+description = "Start the Student Performance Tracker application with patched startup"
+run = "cd StudentPerformanceTracker006 && node start-server.js"

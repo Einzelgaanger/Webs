@@ -1,0 +1,4 @@
+[workflow.Start]
+name = "Start"
+description = "Start the Student Performance Tracker application"
+run = "cd StudentPerformanceTracker006 && cd server && npx tsx index.ts"
