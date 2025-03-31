@@ -1,5 +1,9 @@
 #!/bin/bash
 
-# Start the Student Performance Tracker application
+echo "----------------------------------------"
 echo "Starting Student Performance Tracker..."
-node start-server.js
+echo "----------------------------------------"
+
+echo "Starting fallback server..."
+cd StudentPerformanceTracker006
+node app.cjs

@@ -1,18 +1,5 @@
-[commands]
-start = ["node", "start-server.js"]
-
-[nix]
-channel = "stable-22_11"
-
-[deployment]
-run = ["node", "start-server.js"]
-
-[languages]
-nodejs = "20.x"
-
-[env]
-PORT = "3000"
-
-[[ports]]
-localPort = 3000
-externalPort = 80
+[workflows.start-app]
+name = "Start App"
+onStart = "cd StudentPerformanceTracker006 && node app.cjs"
+language = "nodejs"
+persistent = true
