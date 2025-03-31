@@ -1,0 +1,6 @@
+[workflow]
+name = "Launcher"
+entrypoint = "./launcher.sh"
+run_command = "./launcher.sh"
+language = "nodejs"
+onBoot = ""

@@ -1,19 +1,17 @@
-[workflows]
-runButton = "Run Student Performance Tracker"
+[commands]
+start = ["node", "start-server.js"]
 
-[[workflows.workflow]]
-name = "Run Student Performance Tracker"
-mode = "serial"
-author = "agent"
+[nix]
+channel = "stable-22_11"
 
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
+[deployment]
+run = ["node", "start-server.js"]
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-name = "Start the Student Performance Tracker app"
-args = "cd StudentPerformanceTracker006 && node app.cjs"
-waitForPort = 3000
+[languages]
+nodejs = "20.x"
+
+[env]
+PORT = "3000"
 
 [[ports]]
 localPort = 3000

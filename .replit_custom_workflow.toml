@@ -1,34 +1,8 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
-run = "bash StudentPerformanceTracker006/run.sh"
-hidden = [".config", ".git", "generated-icon.png", "node_modules", "dist"]
-
-[nix]
-channel = "stable-24_05"
-
-[deployment]
-deploymentTarget = "cloudrun"
-build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+[commands]
+student-tracker = "cd StudentPerformanceTracker006 && node app.cjs"
 
 [env]
-NODE_ENV = "development"
-
-[workflows]
-runButton = "Run Student Performance Tracker"
-
-[[workflows.workflow]]
-name = "Run Student Performance Tracker"
-mode = "serial"
-author = "agent"
-
-[workflows.workflow.metadata]
-agentRequireRestartOnSave = false
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-name = "Start the Student Performance Tracker app"
-args = "cd StudentPerformanceTracker006 && bash run.sh"
-waitForPort = 3000
+PORT = "3000"
 
 [[ports]]
 localPort = 3000

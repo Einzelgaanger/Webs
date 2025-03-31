@@ -57,9 +57,9 @@ else
   echo "❌ Fallback server failed to start"
 fi
 
-# Try to start the main TypeScript server
+# Try to start the main TypeScript server with our new CJS wrapper
 echo "Starting main application server..."
-node start-server.js > app.log 2>&1 &
+node start-server.cjs > app.log 2>&1 &
 MAIN_PID=$!
 
 echo "Waiting for main server to start..."

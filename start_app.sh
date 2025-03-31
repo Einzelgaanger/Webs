@@ -1,38 +1,25 @@
 #!/bin/bash
 
-# This script prepares and starts the Student Performance Tracker application
-echo "🔄 Setting up Student Performance Tracker workflow..."
+# Stop any running node processes
+pkill -f node || true
 
-# Copy the custom workflow configuration
-cp .replit_custom_workflow.toml .replit
-echo "✅ Custom workflow configuration applied"
+# Make sure the application directories exist
+mkdir -p StudentPerformanceTracker006/uploads/profiles
+mkdir -p StudentPerformanceTracker006/uploads/notes
+mkdir -p StudentPerformanceTracker006/uploads/assignments
 
-# Set execution permission for the run script
-chmod +x StudentPerformanceTracker006/run.sh
-echo "✅ Run script permissions set"
+# Navigate to application directory and start the server
+cd StudentPerformanceTracker006
+node app.cjs &
 
-# Show startup information
-echo "
-🚀 Student Performance Tracker is ready to run!
+# Wait a bit for the server to start
+sleep 2
 
-To start the application:
-1. Click on the 'Run' button at the top of the screen
-2. The application will start on port 3000
-3. Wait for the startup logs to complete
-
-✅ Authentication troubleshooting has been applied:
-   - Database connection handling improved
-   - User credential matching enhanced with more flexible search
-
-📝 Default login credentials:
-   - Name: Samsam Abdul Nassir
-   - Admission Number: SDS001
-   - Default password: sds#website
-
-🔄 If you encounter any issues, check the logs in:
-   - app.log (main server logs)
-   - server.log (fallback server logs)
-"
-
-# Done
-echo "✅ Setup complete"
+# Check if the server is running
+if pgrep -f "node app.cjs" > /dev/null
+then
+  echo "Server is running."
+  echo "You can access it at: http://localhost:3000"
+else
+  echo "Failed to start the server."
+fi
