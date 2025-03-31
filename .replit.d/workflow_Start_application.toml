@@ -1,0 +1,4 @@
+[workflow.Start_application]
+name = "Start application"
+description = "Start the Student Performance Tracker application"
+run = "cd StudentPerformanceTracker006 && npm run dev"

@@ -11,7 +11,7 @@ import path from "path";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 declare global {
   namespace Express {
@@ -108,7 +108,7 @@ export function setupAuth(app: Express) {
     maxAge: 24 * 60 * 60 * 1000 // 24 hours cache
   }));
 
-  // Enhanced authentication strategy with better logging and error handling
+  // Completely enhanced authentication strategy with improved diagnostics and error handling
   passport.use(
     new LocalStrategy(
       {
@@ -120,31 +120,50 @@ export function setupAuth(app: Express) {
         try {
           // Comprehensive logging for authentication attempts
           console.log(`🔐 LOGIN ATTEMPT - Name: "${req.body.name}", Admission: "${admissionNumber}"`);
+          console.log(`🔍 DATABASE: Verifying database connection...`);
           
-          // First try - all users count to verify database connection
+          // First verify the database is accessible and users exist
           let allUsers = [];
           try {
+            // Try a simple query first to test connection
+            await db.execute(sql`SELECT 1`);
+            console.log(`✅ DATABASE: Initial connection test successful`);
+            
+            // Then retrieve all users - keep this for flexible matching
             allUsers = await db.select().from(users);
-            console.log(`✅ Database connected, ${allUsers.length} users found`);
-          } catch (err) {
-            console.error('❌ DATABASE CONNECTION ERROR:', err);
-            return done(new Error('Database connection error. Please try again later.'));
+            
+            if (allUsers.length === 0) {
+              console.error('❌ DATABASE ERROR: No users found in database');
+              return done(new Error('No users found in the system. Please contact an administrator.'));
+            }
+            
+            console.log(`✅ DATABASE: Successfully retrieved ${allUsers.length} users`);
+          } catch (dbErr) {
+            console.error('❌ DATABASE CONNECTION ERROR:', dbErr);
+            // More helpful error message for users
+            return done(new Error('Unable to connect to the database. Please try again in a few minutes.'));
           }
           
-          // Log first user for debugging (with sensitive data masked)
-          if (allUsers.length > 0) {
-            const debugUser = {...allUsers[0]};
-            if (debugUser.password) debugUser.password = '******';
-            console.log(`FIRST USER SAMPLE: ${JSON.stringify(debugUser, null, 2)}`);
+          // Enhanced user discovery process with multiple fallback strategies
+          console.log(`🔍 USER LOOKUP: Starting user discovery process...`);
+          let user = null;
+          
+          // Strategy 1: Try primary lookup method first (via storage service)
+          if (!user && req.body.name && admissionNumber) {
+            console.log(`👉 Strategy 1: Looking up by name and admission number`);
+            try {
+              user = await storage.getUserByCredentials(req.body.name, admissionNumber);
+              if (user) {
+                console.log(`✅ Found user via storage service: ${user.name}`);
+              }
+            } catch (lookupErr) {
+              console.error('Error in primary lookup:', lookupErr);
+            }
           }
           
-          // Find user with multi-step approach
-          // Step 1: Try exact credentials first (most precise match)
-          let user = await storage.getUserByCredentials(req.body.name, admissionNumber);
-          
-          // Step 2: Try with just admission number if not found
-          if (!user) {
-            console.log(`👉 Trying with admission number only: "${admissionNumber}"`);
+          // Strategy 2: Try direct database query with exact admission number if still not found
+          if (!user && admissionNumber) {
+            console.log(`👉 Strategy 2: Looking up by exact admission number: "${admissionNumber}"`);
             try {
               const userByAdmission = await db.select().from(users)
                 .where(eq(users.admissionNumber, admissionNumber.trim()))
@@ -152,91 +171,118 @@ export function setupAuth(app: Express) {
                 
               if (userByAdmission && userByAdmission.length > 0) {
                 user = userByAdmission[0];
-                console.log(`✅ Found user by admission number: ${user.name}`);
+                console.log(`✅ Found user by exact admission number: ${user.name}`);
               }
-            } catch (err) {
-              console.error('Error searching by admission number:', err);
+            } catch (queryErr) {
+              console.error('Error searching by admission number:', queryErr);
             }
           }
           
-          // Step 3: Try case-insensitive search as last resort
-          if (!user) {
-            console.log('👉 Using flexible matching to find user');
+          // Strategy 3: Try more flexible case-insensitive search with normalization
+          if (!user && req.body.name && admissionNumber) {
+            console.log('👉 Strategy 3: Using case-insensitive matching for name and admission');
             try {
-              // Normalize the input for better matching
+              // Normalize input for better matching success
               const normalizedName = req.body.name.trim().toLowerCase();
               const normalizedAdmissionNumber = admissionNumber.trim().toLowerCase();
               
               console.log(`Searching for: Name="${normalizedName}", Admission="${normalizedAdmissionNumber}"`);
               
-              // Case-insensitive search through all users
+              // First try exact case-insensitive match
               let foundUser = allUsers.find(u => 
                 u.name.toLowerCase().trim() === normalizedName && 
                 u.admissionNumber.toLowerCase().trim() === normalizedAdmissionNumber
               );
               
-              // If still not found, try even more lenient matching (partial or fuzzy)
-              if (!foundUser && normalizedName && normalizedAdmissionNumber) {
-                foundUser = allUsers.find(u => 
-                  (u.name.toLowerCase().includes(normalizedName) || 
-                   normalizedName.includes(u.name.toLowerCase())) && 
-                  (u.admissionNumber.toLowerCase().includes(normalizedAdmissionNumber) ||
-                   normalizedAdmissionNumber.includes(u.admissionNumber.toLowerCase()))
-                );
-              }
-              
               if (foundUser) {
-                console.log(`✅ Found matching user with ID ${foundUser.id}: ${foundUser.name}`);
                 user = foundUser;
+                console.log(`✅ Found user via exact case-insensitive match: ${user.name}`);
               }
-            } catch (err) {
-              console.error('Error during flexible user lookup:', err);
+            } catch (flexErr) {
+              console.error('Error during case-insensitive matching:', flexErr);
             }
           }
           
-          // Return authentication failure if no user found
+          // Strategy 4: Ultra-flexible fuzzy matching as last resort
+          if (!user && req.body.name && admissionNumber) {
+            console.log('👉 Strategy 4: Using fuzzy matching as last resort');
+            try {
+              const normalizedName = req.body.name.trim().toLowerCase();
+              const normalizedAdmissionNumber = admissionNumber.trim().toLowerCase();
+              
+              // Try partial/contained matching in either direction
+              let foundUser = allUsers.find(u => 
+                // For name: either user name contains input OR input contains user name
+                (u.name.toLowerCase().includes(normalizedName) || 
+                 normalizedName.includes(u.name.toLowerCase())) && 
+                // Same for admission number 
+                (u.admissionNumber.toLowerCase().includes(normalizedAdmissionNumber) ||
+                 normalizedAdmissionNumber.includes(u.admissionNumber.toLowerCase()))
+              );
+              
+              if (foundUser) {
+                user = foundUser;
+                console.log(`✅ Found user via fuzzy matching: ${user.name} (ID: ${user.id})`);
+              }
+            } catch (fuzzyErr) {
+              console.error('Error during fuzzy matching:', fuzzyErr);
+            }
+          }
+          
+          // Return authentication failure if no user found after all strategies
           if (!user) {
-            console.log(`❌ AUTHENTICATION FAILED: User not found for "${req.body.name}" with admission number: "${admissionNumber}"`);
+            console.log(`❌ AUTHENTICATION FAILED: User not found`);
+            console.log(`Details: Name="${req.body.name}", Admission="${admissionNumber}"`);
             return done(null, false);
           }
           
-          // Enhanced password validation with proper error handling
+          // Enhanced password validation with multiple fallback strategies
+          console.log(`🔐 PASSWORD VERIFICATION: Validating password for ${user.name}...`);
           let isPasswordValid = false;
           
+          // Strategy 1: Standard password comparison
           try {
-            // Try standard password comparison first
+            console.log(`👉 Strategy 1: Standard password comparison`);
             isPasswordValid = await comparePasswords(password, user.password);
-            console.log('Password comparison result:', isPasswordValid);
-          } catch (err) {
-            console.error('❌ Error comparing passwords:', err);
+            if (isPasswordValid) {
+              console.log(`✅ Password verified successfully`);
+            } else {
+              console.log(`❌ Standard password comparison failed`);
+            }
+          } catch (passErr) {
+            console.error('❌ Error in standard password comparison:', passErr);
           }
           
-          // Special case for the default password to improve user experience
+          // Strategy 2: Special handling for default password 
           if (!isPasswordValid && (password === 'sds#website' || password.toLowerCase() === 'sds#website')) {
-            console.log('👉 Using special case for default password');
+            console.log(`👉 Strategy 2: Checking for default password match`);
             
-            // For the default password, we're more lenient by checking again with the default
+            // For default password, we're more lenient and update the hash
             try {
-              // Generate a fresh hash for the default password
-              const defaultHash = await hashPassword('sds#website');
-              
-              // Update the user's password to prevent future issues
-              await storage.updateUserPassword(user.id, defaultHash);
-              user.password = defaultHash;
-              
-              isPasswordValid = true;
-              console.log('✅ Default password validated and hash updated for reliability');
-            } catch (err) {
-              console.error('❌ Error updating password hash:', err);
+              // First check with direct string comparison (as fallback)
+              if (password === 'sds#website' || password.toLowerCase() === 'sds#website') {
+                // Generate a fresh hash for the default password
+                const defaultHash = await hashPassword('sds#website');
+                
+                // Update the user's password hash in database
+                await storage.updateUserPassword(user.id, defaultHash);
+                user.password = defaultHash;
+                
+                isPasswordValid = true;
+                console.log('✅ Default password accepted and hash updated for future reliability');
+              }
+            } catch (defaultErr) {
+              console.error('❌ Error processing default password:', defaultErr);
             }
           }
           
+          // If password validation failed with all strategies, return authentication failure
           if (!isPasswordValid) {
             console.log(`❌ AUTHENTICATION FAILED: Invalid password for user: ${user.name}`);
             return done(null, false);
           }
           
-          // Format user to match Express.User interface
+          // Format user to match Express.User interface for session
           const userSession = {
             id: user.id,
             name: user.name,
@@ -247,12 +293,12 @@ export function setupAuth(app: Express) {
             role: user.role || null
           };
           
-          console.log(`✅ AUTHENTICATION SUCCESS: Login successful for: ${user.name}`);
+          console.log(`✅ AUTHENTICATION SUCCESS: Login successful for: ${user.name} (Role: ${user.role || 'not set'})`);
           return done(null, userSession);
         } catch (err) {
           console.error('❌ CRITICAL AUTHENTICATION ERROR:', err);
-          // Return a generic error to avoid leaking information
-          return done(new Error('An error occurred during authentication. Please try again.'));
+          // Return a generic but helpful error message
+          return done(new Error('An unexpected error occurred during login. Please try again or contact support.'));
         }
       }
     )
@@ -354,71 +400,127 @@ export function setupAuth(app: Express) {
     }
   });
   
-  // Forgot Password Endpoint - Resets to default password for educational system
-  // Now requires a secret key that only the admin knows for additional security
+  // Enhanced Forgot Password Endpoint with more reliable reset functionality
   app.post("/api/forgot-password", async (req, res, next) => {
     try {
       const { name, admissionNumber, secretKey } = req.body;
       
-      console.log(`Password reset attempt for: ${name}, ${admissionNumber}`);
+      console.log(`🔐 PASSWORD RESET ATTEMPT - Name: "${name}", Admission: "${admissionNumber}"`);
       
       if (!name || !admissionNumber || !secretKey) {
+        console.log(`❌ PASSWORD RESET FAILED: Missing required fields`);
         return res.status(400).json({ 
           success: false,
-          message: "Name, admission number, and secret key are required" 
+          message: "Name, admission number, and secret key are required for password reset." 
         });
       }
       
-      // Check the secret key - this is a fixed value known only to the admin
-      // Using a more common secret key that's easier to remember and share
-      const ADMIN_SECRET_KEY = "reset123";
+      // Simplified and fixed secret key for educational system
+      // NOTE: In a production environment, this would be an environment variable
+      const ADMIN_SECRET_KEY = "passpass!";
       
-      // More flexible matching for the secret key to handle common input errors
-      if (secretKey.trim().toLowerCase() !== ADMIN_SECRET_KEY.toLowerCase()) {
-        console.log(`Password reset REJECTED - Invalid secret key used for ${name}, ${admissionNumber}`);
-        console.log(`Secret key provided: "${secretKey}", expected: "${ADMIN_SECRET_KEY}"`);
+      // More flexible matching for the secret key with detailed logging
+      if (secretKey.trim() !== ADMIN_SECRET_KEY) {
+        console.log(`❌ PASSWORD RESET REJECTED - Invalid secret key used`);
+        console.log(`Secret key provided: "${secretKey}" (expected: "${ADMIN_SECRET_KEY}")`);
         return res.status(403).json({
           success: false,
           message: "Invalid secret key. Please contact the administrator for the correct key."
         });
       }
       
-      console.log(`Password reset attempt for ${name}, ${admissionNumber} with valid secret key`);
+      console.log(`✅ Valid secret key provided for password reset`);
       
-      // Find the user with flexible matching
-      const allUsers = await db.select().from(users);
-      console.log(`Found ${allUsers.length} users in database`);
-      
-      // Try case-insensitive matching
-      let user = allUsers.find(u => 
-        u.name.toLowerCase() === name.toLowerCase() && 
-        u.admissionNumber.toLowerCase() === admissionNumber.toLowerCase()
-      );
-      
-      if (!user) {
-        console.log(`User not found for password reset: ${name}, ${admissionNumber}`);
-        // For security, still return a generic message
-        return res.status(400).json({
+      // Retrieve all users to allow for flexible matching
+      let allUsers = [];
+      try {
+        allUsers = await db.select().from(users);
+        console.log(`✅ Found ${allUsers.length} users in database for matching`);
+      } catch (dbErr) {
+        console.error('❌ DATABASE ERROR during password reset:', dbErr);
+        return res.status(500).json({
           success: false,
-          message: "Could not find an account with that name and admission number."
+          message: "Database error occurred. Please try again later."
         });
       }
       
-      console.log(`Found user for password reset: ${user.name} (ID: ${user.id})`);
+      if (allUsers.length === 0) {
+        console.log(`❌ Password reset failed: No users found in database`);
+        return res.status(500).json({
+          success: false,
+          message: "System error: No users found in database."
+        });
+      }
       
-      // Reset password to default
-      const hashedPassword = await hashPassword("sds#website");
-      await storage.updateUserPassword(user.id, hashedPassword);
+      // Enhanced user finding logic with multiple fallback strategies
+      // Strategy 1: Exact match (case-insensitive)
+      let user = allUsers.find(u => 
+        u.name.toLowerCase().trim() === name.toLowerCase().trim() && 
+        u.admissionNumber.toLowerCase().trim() === admissionNumber.toLowerCase().trim()
+      );
       
-      console.log(`Password reset successful for ${user.name}`);
+      // Strategy 2: Flexible admission number matching if needed
+      if (!user) {
+        console.log(`👉 Trying flexible admission number matching...`);
+        user = allUsers.find(u => 
+          u.name.toLowerCase().trim() === name.toLowerCase().trim() && 
+          (u.admissionNumber.toLowerCase().trim().includes(admissionNumber.toLowerCase().trim()) ||
+           admissionNumber.toLowerCase().trim().includes(u.admissionNumber.toLowerCase().trim()))
+        );
+      }
       
-      res.status(200).json({
-        success: true,
-        message: "Your password has been reset to the default password: sds#website"
-      });
+      // Strategy 3: Even more relaxed name matching as last resort
+      if (!user) {
+        console.log(`👉 Trying more flexible name matching...`);
+        user = allUsers.find(u => 
+          (u.name.toLowerCase().includes(name.toLowerCase()) || 
+           name.toLowerCase().includes(u.name.toLowerCase())) &&
+          u.admissionNumber.toLowerCase().trim() === admissionNumber.toLowerCase().trim()
+        );
+      }
+      
+      if (!user) {
+        console.log(`❌ User not found for password reset: "${name}", "${admissionNumber}"`);
+        // For security, return a more helpful but still generic message
+        return res.status(400).json({
+          success: false,
+          message: "Could not find an account with that name and admission number. Please check your spelling and try again."
+        });
+      }
+      
+      console.log(`✅ Found user for password reset: ${user.name} (ID: ${user.id})`);
+      
+      // Reset password to the standard default password
+      const DEFAULT_PASSWORD = "sds#website";
+      try {
+        const hashedPassword = await hashPassword(DEFAULT_PASSWORD);
+        
+        // Update the password in the database
+        const updatedUser = await storage.updateUserPassword(user.id, hashedPassword);
+        
+        if (!updatedUser) {
+          throw new Error("Failed to update user password in database");
+        }
+        
+        console.log(`✅ Password reset successful for ${user.name}`);
+        
+        res.status(200).json({
+          success: true,
+          message: `Your password has been reset to the default password: ${DEFAULT_PASSWORD}`
+        });
+      } catch (updateErr) {
+        console.error('❌ ERROR updating password:', updateErr);
+        res.status(500).json({
+          success: false,
+          message: "An error occurred while resetting your password. Please try again later."
+        });
+      }
     } catch (err) {
-      console.error('Password reset error:', err);
-      next(err);
+      console.error('❌ CRITICAL PASSWORD RESET ERROR:', err);
+      res.status(500).json({
+        success: false,
+        message: "An unexpected error occurred. Please try again later."
+      });
     }
   });
 
