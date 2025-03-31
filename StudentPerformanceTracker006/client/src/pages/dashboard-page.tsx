@@ -1,14 +1,15 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Activity, Assignment } from "@shared/schema";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Sidebar from "@/components/sidebar";
 import { useState, useEffect } from "react";
 import StatCard from "@/components/StatCard";
-import { CheckCircle, Clock, FileText, Trophy, Menu } from "lucide-react";
+import { CheckCircle, Clock, FileText, Trophy, Menu, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { Link, useLocation } from "wouter";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -203,32 +204,80 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     )}
-                    {deadlines?.map((assignment) => (
-                      <tr key={assignment.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium">{assignment.title}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm">{assignment.unitCode}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className={`text-sm ${new Date(assignment.deadline) < new Date() ? 'text-red-500 font-medium' : ''}`}>
-                            {formatDistanceToNow(new Date(assignment.deadline), { addSuffix: true })}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {assignment.completed ? (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                              Completed
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
-                              Pending
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {deadlines?.map((assignment) => {
+                      const isOverdue = new Date(assignment.deadline) < new Date();
+                      
+                      // Mark assignment as complete mutation
+                      const completeAssignment = useMutation({
+                        mutationFn: async () => {
+                          await apiRequest(`/api/units/${assignment.unitCode}/assignments/${assignment.id}/complete`, {
+                            method: "POST",
+                          });
+                        },
+                        onSuccess: () => {
+                          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/deadlines"] });
+                          queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+                          queryClient.invalidateQueries({ queryKey: [`/api/units/${assignment.unitCode}/assignments`] });
+                        }
+                      });
+                      
+                      return (
+                        <tr 
+                          key={assignment.id} 
+                          className={`${!assignment.completed ? "hover:bg-gray-50 cursor-pointer" : ""}`}
+                          onClick={() => {
+                            if (!assignment.completed) {
+                              window.location.href = `/units/${assignment.unitCode}`;
+                            }
+                          }}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium flex items-center">
+                              {assignment.title}
+                              {!assignment.completed && 
+                                <Link href={`/units/${assignment.unitCode}`}>
+                                  <ExternalLink className="ml-2 h-3 w-3 text-gray-400 hover:text-primary" />
+                                </Link>
+                              }
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm">
+                              <Link href={`/units/${assignment.unitCode}`} className="text-primary hover:underline">
+                                {assignment.unitCode}
+                              </Link>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className={`text-sm ${isOverdue ? 'text-red-500 font-medium' : ''}`}>
+                              {formatDistanceToNow(new Date(assignment.deadline), { addSuffix: true })}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {assignment.completed ? (
+                              <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                                Completed
+                              </span>
+                            ) : (
+                              <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                  Pending
+                                </span>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={() => completeAssignment.mutate()}
+                                  disabled={completeAssignment.isPending}
+                                >
+                                  {completeAssignment.isPending ? "..." : "Mark Complete"}
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -1,19 +1,21 @@
 run = "cd StudentPerformanceTracker006 && node app.cjs"
+hidden = [".config", "package-lock.json"]
 
-[env]
-PORT = "3000"
+[packager]
+language = "nodejs"
+
+[languages.javascript]
+pattern = "**/*.{js,ts,jsx,tsx}"
+
+[languages.javascript.languageServer]
+start = [ "typescript-language-server", "--stdio" ]
 
 [nix]
-channel = "stable-24_05"
+channel = "stable-23_11"
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", ".config"]
 
 [[ports]]
 localPort = 3000
 externalPort = 80
-
-[[ports]]
-localPort = 4000
-externalPort = 3000
-
-[[ports]]
-localPort = 5000
-externalPort = 5000

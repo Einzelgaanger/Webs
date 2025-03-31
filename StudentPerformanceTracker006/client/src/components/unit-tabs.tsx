@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -11,8 +11,9 @@ import AssignmentCard from "./AssignmentCard";
 import NoteCard from "./NoteCard";
 import PastPaperCard from "./PastPaperCard";
 import RankingTable from "./RankingTable";
-import { AlertCircle, Check, FileText, BarChart } from "lucide-react";
+import { AlertCircle, Check, FileText, BarChart, Search, X } from "lucide-react";
 import { Button } from "./ui/button";
+import { Input } from "./ui/input";
 
 type UnitTabsProps = {
   unitCode: string;
@@ -23,6 +24,10 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isAssignmentsModalOpen, setIsAssignmentsModalOpen] = useState(false);
   const [isPastPapersModalOpen, setIsPastPapersModalOpen] = useState(false);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentTab, setCurrentTab] = useState("notes");
 
   // Fetch content for the tabs
   const { data: notes, isLoading: isLoadingNotes } = useQuery<Note[]>({
@@ -36,6 +41,29 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
   const { data: pastPapers, isLoading: isLoadingPastPapers } = useQuery<PastPaper[]>({
     queryKey: [`/api/units/${unitCode}/pastpapers`],
   });
+
+  // Filtered data based on search
+  const filteredNotes = notes?.filter(note => 
+    searchQuery === "" || 
+    note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    note.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    note.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredAssignments = assignments?.filter(assignment => 
+    searchQuery === "" || 
+    assignment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    assignment.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    assignment.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const filteredPastPapers = pastPapers?.filter(paper => 
+    searchQuery === "" || 
+    paper.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    paper.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    paper.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    paper.year.toString().includes(searchQuery)
+  );
 
   // Count notifications
   const unreadNotes = notes?.filter(note => !note.viewed).length || 0;
@@ -69,9 +97,20 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
     },
   });
 
+  // Track tab changes
+  const handleTabChange = (value: string) => {
+    setCurrentTab(value);
+    setSearchQuery("");
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
+
   return (
     <>
-      <Tabs defaultValue="notes">
+      <Tabs defaultValue="notes" onValueChange={handleTabChange}>
         <div className="overflow-x-auto pb-2 mb-2">
           <TabsList className="mb-2 inline-flex min-w-max">
             <TabsTrigger value="notes" className="flex items-center space-x-2">
@@ -108,6 +147,38 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
           </TabsList>
         </div>
 
+        {/* Search bar for all except rankings */}
+        {currentTab !== "rank" && (
+          <div className="relative mb-4">
+            <div className="flex items-center bg-gray-50 border rounded-md focus-within:ring-2 focus-within:ring-primary transition-all">
+              <Search className="ml-3 h-4 w-4 shrink-0 text-gray-500" />
+              <Input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={`Search ${currentTab}...`}
+                className="flex w-full rounded-md border-0 bg-transparent py-2 text-sm focus:outline-none focus:ring-0 focus-visible:ring-0"
+              />
+              {searchQuery && (
+                <Button 
+                  variant="ghost" 
+                  onClick={clearSearch} 
+                  className="h-auto px-3 py-2 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            {searchQuery && (
+              <div className="mt-1 text-xs text-gray-500">
+                {currentTab === "notes" && filteredNotes?.length} results found
+                {currentTab === "assignments" && filteredAssignments?.length} results found
+                {currentTab === "pastpapers" && filteredPastPapers?.length} results found
+              </div>
+            )}
+          </div>
+        )}
+
         <TabsContent value="notes">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -136,9 +207,17 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
               <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
               <p>No notes available yet</p>
             </div>
+          ) : filteredNotes?.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+              <p>No matching notes found</p>
+              <Button variant="link" onClick={clearSearch} className="mt-2">
+                Clear search
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {notes?.map(note => (
+              {filteredNotes?.map(note => (
                 <NoteCard
                   key={note.id}
                   note={note}
@@ -178,9 +257,17 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
               <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
               <p>No assignments available yet</p>
             </div>
+          ) : filteredAssignments?.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+              <p>No matching assignments found</p>
+              <Button variant="link" onClick={clearSearch} className="mt-2">
+                Clear search
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {assignments?.map(assignment => (
+              {filteredAssignments?.map(assignment => (
                 <AssignmentCard
                   key={assignment.id}
                   assignment={assignment}
@@ -219,9 +306,17 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
               <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
               <p>No past papers available yet</p>
             </div>
+          ) : filteredPastPapers?.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">
+              <AlertCircle className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+              <p>No matching past papers found</p>
+              <Button variant="link" onClick={clearSearch} className="mt-2">
+                Clear search
+              </Button>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {pastPapers?.map(paper => (
+              {filteredPastPapers?.map(paper => (
                 <PastPaperCard
                   key={paper.id}
                   pastPaper={paper}
