@@ -31,15 +31,13 @@ export async function initializeDatabase() {
   
   // More robust connection with error handling and SSL support
   const client = postgres(connectionString, {
-    ssl: {
-      rejectUnauthorized: false // Required for Replit hosted databases
-    },
+    ssl: false, // Disable SSL for local development
     idle_timeout: 20,
     connect_timeout: 30,
     max: 5 // Fewer connections for initialization
   });
   
-  const db = drizzle(client, {});
+  const db = drizzle(client, { schema: { users, units, notes, assignments, pastPapers, completedAssignments, userNoteViews, userPaperViews } });
   
   try {
     // Check if the users table exists
@@ -69,7 +67,8 @@ export async function initializeDatabase() {
           password TEXT NOT NULL,
           profile_image_url TEXT,
           rank INTEGER,
-          role TEXT DEFAULT 'student'
+          role TEXT DEFAULT 'student',
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
         )
       `);
       
@@ -80,7 +79,7 @@ export async function initializeDatabase() {
           unit_code TEXT NOT NULL UNIQUE,
           name TEXT NOT NULL,
           description TEXT,
-          category TEXT
+          category TEXT NOT NULL
         )
       `);
       
@@ -93,7 +92,8 @@ export async function initializeDatabase() {
           file_url TEXT,
           unit_code TEXT NOT NULL,
           user_id INTEGER NOT NULL REFERENCES users(id),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+          search_vector TEXT
         )
       `);
       
@@ -106,8 +106,9 @@ export async function initializeDatabase() {
           file_url TEXT,
           unit_code TEXT NOT NULL,
           user_id INTEGER NOT NULL REFERENCES users(id),
-          deadline TIMESTAMP WITH TIME ZONE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+          deadline TIMESTAMP WITH TIME ZONE NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+          search_vector TEXT
         )
       `);
       
@@ -121,7 +122,8 @@ export async function initializeDatabase() {
           file_url TEXT,
           unit_code TEXT NOT NULL,
           user_id INTEGER NOT NULL REFERENCES users(id),
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+          search_vector TEXT
         )
       `);
       
@@ -131,7 +133,8 @@ export async function initializeDatabase() {
           id SERIAL PRIMARY KEY,
           assignment_id INTEGER NOT NULL REFERENCES assignments(id),
           user_id INTEGER NOT NULL REFERENCES users(id),
-          completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+          completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+          UNIQUE(assignment_id, user_id)
         )
       `);
       

@@ -1,10 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { setupRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initializeDatabase } from "./init-db";
 import { seed } from "./seed";
 import fs from "fs";
 import path from "path";
+import { config } from "dotenv";
+import cors from 'cors';
+import { db, testConnection, runMigrations } from './db';
+import { setupMiddleware } from './middleware';
+
+// Load environment variables
+config();
 
 // Ensure necessary directories exist
 function ensureDirectoriesExist() {
@@ -83,65 +90,56 @@ app.use((req, res, next) => {
   next();
 });
 
-(async () => {
-  // Initialize database before setting up routes
-  await initializeDatabase();
-  
-  // Run seed script to ensure all required users and data are present
+// Setup middleware
+setupMiddleware(app);
+
+// Setup routes
+setupRoutes(app);
+
+// Initialize database and start server
+async function startServer() {
   try {
-    await seed();
-    log("Seed process completed", "seed");
+    // Initialize database
+    await initializeDatabase();
+    
+    // Test database connection
+    const isConnected = await testConnection();
+    if (!isConnected) {
+      throw new Error('Failed to connect to database');
+    }
+
+    // Run migrations
+    await runMigrations();
+
+    // Start server with error handling
+    const port = process.env.PORT || 3000;
+    const server = app.listen(port, '127.0.0.1', () => {
+      console.log(`🚀 Server running on http://127.0.0.1:${port}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+    });
+
+    // Handle server errors
+    server.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} is already in use. Please try a different port.`);
+      } else {
+        console.error('❌ Server error:', error);
+      }
+      process.exit(1);
+    });
+
+    // Handle process termination
+    process.on('SIGTERM', () => {
+      console.log('SIGTERM received. Shutting down gracefully...');
+      server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+      });
+    });
   } catch (error) {
-    log(`Seed error: ${(error as Error).message}`, "seed");
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
   }
-  
-  const server = await registerRoutes(app);
+}
 
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    
-    // Log the error with more details for debugging
-    console.error('API ERROR:', {
-      status,
-      message,
-      stack: err.stack,
-      path: _req.path,
-      method: _req.method,
-      query: _req.query,
-      body: _req.body ? JSON.stringify(_req.body).substring(0, 200) : null
-    });
-
-    // Send a sanitized error response
-    res.status(status).json({
-      success: false,
-      message: process.env.NODE_ENV === 'production' 
-        ? (status === 500 ? 'Internal Server Error' : message)
-        : message
-    });
-    
-    // Don't throw the error after handling it
-    // This prevents the server from crashing
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
-
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
-})();
+startServer();

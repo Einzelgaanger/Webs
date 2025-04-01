@@ -177,7 +177,7 @@ export const notifications = pgTable("notifications", {
   userId: integer("user_id").notNull().references(() => users.id),
   title: text("title").notNull(),
   message: text("message").notNull(),
-  read: boolean("read").default(false).notNull(),
+  read: text("read").default("false").notNull(),
   type: text("type").notNull(), // 'assignment', 'note', 'pastpaper', 'system'
   resourceId: integer("resource_id"), // ID of the related resource
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -24,7 +24,10 @@ import { promisify } from "util";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { formatDistance, isPast } from "date-fns";
-import pg from "pg";
+import express from "express";
+import MemoryStore from "memorystore";
+import pkg from "pg";
+const { Pool } = pkg;
 
 const PostgresStore = connectPgSimple(session);
 const scryptAsync = promisify(scrypt);
@@ -81,7 +84,7 @@ export class DatabaseStorage implements IStorage {
   
   constructor() {
     // Create a PostgreSQL connection pool for the session store with enhanced configuration
-    const pool = new pg.Pool({
+    const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: {
         rejectUnauthorized: false // Required for Replit PostgreSQL

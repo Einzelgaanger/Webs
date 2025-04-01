@@ -22,7 +22,7 @@ process.env.DEBUG_URL = null; // Prevents the error by nullifying the debug URL
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-export async function registerRoutes(app: Express): Promise<Server> {
+export function setupRoutes(app: Express) {
   // Set up auth routes and middleware
   setupAuth(app);
 
@@ -404,6 +404,5 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  const httpServer = createServer(app);
-  return httpServer;
+  return app;
 }

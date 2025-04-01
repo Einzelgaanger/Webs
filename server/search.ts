@@ -4,7 +4,8 @@
  * Provides search functionality across notes, assignments, and past papers
  */
 
-import { Pool } from 'pg';
+import pkg from 'pg';
+const { Pool } = pkg;
 import { Request, Response } from 'express';
 
 // Create a connection pool
