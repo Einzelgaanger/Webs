@@ -1,152 +1,137 @@
 # Student Performance Tracker - Deployment Guide
 
-This guide provides instructions for deploying the Student Performance Tracker application to [Render.com](https://render.com), a modern cloud platform that makes it easy to deploy applications without the complexity of managing infrastructure.
+This guide provides step-by-step instructions for deploying the Student Performance Tracker application to Render.com.
 
 ## Prerequisites
 
-1. A [Render.com](https://render.com) account
-2. A [Supabase](https://supabase.com) account for database and file storage
-3. The Student Performance Tracker codebase
+Before you begin, make sure you have:
 
-## Step 1: Set Up Supabase
+1. A Render.com account
+2. A Supabase account with the following configured:
+   - Two storage buckets: `profiles` and `files`
+   - Appropriate bucket policies (public read access recommended)
+3. Your application code in a Git repository (GitHub, GitLab, etc.)
 
-### Create a Supabase Project
+## Deployment Steps
 
-1. Log in to your Supabase account at [app.supabase.com](https://app.supabase.com)
-2. Click "New Project"
-3. Provide a name for your project (e.g., "student-tracker")
-4. Choose a strong database password and save it securely
-5. Select the region closest to your users
-6. Click "Create new project"
+### 1. Set Up Supabase Storage
 
-### Set Up Storage Buckets
+1. Log in to your Supabase dashboard
+2. Navigate to Storage and create two buckets:
+   - `profiles` - For storing user profile images
+   - `files` - For storing assignments, notes, and past papers
+3. Configure appropriate permissions for each bucket:
+   - Public read access recommended
+   - Authenticated-only write access
 
-1. Once your project is created, go to "Storage" in the left sidebar
-2. Create two new buckets:
-   - `profiles` - For user profile images
-   - `files` - For assignments, notes, and other documents
-3. Configure bucket policies to control access:
-   - For basic setup, you can set both buckets to "Public" for testing
+### 2. Deploy to Render.com Using Blueprint
 
-### Get Supabase Credentials
+#### Option 1: Using the Render Dashboard (Manual Setup)
 
-1. Go to "Settings" > "API" in the left sidebar
-2. Copy the following values:
-   - **URL**: Your Supabase project URL
-   - **anon/public key**: For client-side operations
-   
-These values will be needed for your environment variables.
+1. Log in to your Render dashboard
+2. Create a new PostgreSQL database:
+   - Click "New +" → "PostgreSQL"
+   - Name: `student-tracker-db` (or your preferred name)
+   - Select an appropriate plan
+   - Click "Create Database"
+   - Note the connection string which will be used later
 
-## Step 2: Deploy to Render
+3. Create a new Web Service:
+   - Click "New +" → "Web Service"
+   - Connect your Git repository
+   - Name: `student-performance-tracker`
+   - Build Command: `npm install`
+   - Start Command: `bash production-deploy.sh`
+   - Select the appropriate plan
+   - Add the following environment variables:
+     - `NODE_ENV`: `production`
+     - `SESSION_SECRET`: (generate a random string using `openssl rand -hex 32`)
+     - `DATABASE_URL`: (use the connection string from the PostgreSQL database created earlier)
+     - `SUPABASE_URL`: (your Supabase project URL)
+     - `SUPABASE_KEY`: (your Supabase anon key)
+   - Click "Create Web Service"
 
-### Using the Blueprint (Recommended)
+#### Option 2: Using Render Blueprint (Automated Setup)
 
-Render blueprints allow you to define your entire infrastructure in a single file. The Student Performance Tracker includes a `render.yaml` file that automates the deployment process.
+1. Connect your repository to Render
+2. Use the `render.yaml` file included in the repository for automated setup
+3. Follow the prompts to complete setup
+4. Add required environment variables when prompted:
+   - `SUPABASE_URL`
+   - `SUPABASE_KEY`
 
-1. Log in to [Render.com](https://render.com)
-2. Go to the "Blueprints" section
-3. Click "New Blueprint Instance"
-4. Connect your Git repository containing the Student Performance Tracker code
-5. Render will detect the `render.yaml` file and set up the required services
-6. Fill in the required environment variables when prompted:
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_KEY`: Your Supabase anon/public key
+### 3. Verify Deployment
 
-### Manual Deployment
+1. Once deployment is complete, click on the generated URL to access your application
+2. Verify that the application is running correctly
+3. Test the login functionality using the default credentials:
+   - Username: Any of the admission numbers (e.g., `SDS001` for a student or `SDS-T001` for a teacher)
+   - Default password: `sds#website`
 
-If you prefer to set up your application manually:
+### 4. Post-Deployment Tasks
 
-1. Log in to [Render.com](https://render.com)
-2. Go to "Web Services" and click "New Web Service"
-3. Connect your Git repository
-4. Configure the service:
-   - **Name**: student-performance-tracker
-   - **Runtime**: Node
-   - **Build Command**: `npm install`
-   - **Start Command**: `bash production-deploy.sh`
-5. Add the following environment variables:
-   - `NODE_ENV`: `production`
-   - `SESSION_SECRET`: Generate a secure random string
-   - `SUPABASE_URL`: Your Supabase project URL
-   - `SUPABASE_KEY`: Your Supabase anon/public key
-
-## Step 3: Set Up the Database
-
-### Using Render PostgreSQL (Recommended)
-
-1. In your Render dashboard, go to "PostgreSQL" and click "New PostgreSQL Database"
-2. Configure the database:
-   - **Name**: student-tracker-db
-   - **Database**: student_tracker
-   - **User**: student_tracker_user
-3. After creation, copy the "Internal Database URL" for use in your web service
-4. In your web service's environment variables, set:
-   - `DATABASE_URL`: The internal database URL from Render
-
-The application will automatically initialize the database schema on the first run using the `production-deploy.sh` script.
-
-## Step 4: Verify Deployment
-
-1. After deployment is complete, visit your application's URL (provided by Render)
-2. You should see the login page
-3. Log in with the default credentials:
-   - **Admission Number**: Any of the 49 accounts (e.g., "SDS001" for a student or "SDS-T001" for the teacher)
-   - **Password**: "sds#website" (default for all accounts)
+1. Change default passwords for security
+2. Set up automatic database backups in the Render dashboard:
+   - Go to your database settings
+   - Under "Backups", configure your backup frequency
+3. Consider setting up a custom domain (optional):
+   - In your Web Service settings, navigate to "Custom Domain"
+   - Follow the instructions to add your domain
 
 ## Troubleshooting
 
-### Authentication Issues
+### Database Connection Issues
 
-If users cannot log in:
+If you're experiencing database connection issues:
 
-1. Check the server logs in the Render dashboard
-2. Verify that your database is properly initialized
-3. Ensure the `SESSION_SECRET` is properly set
+1. Verify that your `DATABASE_URL` environment variable is correct
+2. Check the database logs in the Render dashboard
+3. Ensure your database service is running
 
-### Database Connection Errors
-
-If you see database connection errors:
-
-1. Verify the `DATABASE_URL` environment variable
-2. Check if the database is running in the Render dashboard
-3. Look for any migration errors in the logs
-
-### File Upload Problems
+### File Upload Issues
 
 If file uploads are not working:
 
-1. Verify the Supabase credentials (`SUPABASE_URL` and `SUPABASE_KEY`)
-2. Check if the storage buckets were properly created
-3. Ensure bucket permissions allow uploads
+1. Verify your Supabase configuration:
+   - Check that both `profiles` and `files` buckets exist
+   - Verify bucket permissions
+2. Check that `SUPABASE_URL` and `SUPABASE_KEY` environment variables are set correctly
+3. Look for any errors in the application logs
 
-## Maintenance and Updates
+### Login Issues
+
+If users cannot log in:
+
+1. Reset the database to ensure the default accounts are properly set up:
+   - Connect to your database using the Render shell or PostgreSQL client
+   - Run the reset script: `node StudentPerformanceTracker006/server/reset-data.js`
+2. Verify that the sessions table is properly created in the database
+
+## Maintenance
+
+### Updating Your Application
+
+To update your application:
+
+1. Push changes to your Git repository
+2. Render will automatically deploy the changes
 
 ### Database Migrations
 
-When updating the application schema:
+For database schema changes:
 
-1. Make the necessary changes to the schema files
-2. Deploy the updated code to Render
-3. The application will handle migrations automatically using Drizzle ORM
-
-### Application Updates
-
-To update the application:
-
-1. Push changes to your Git repository
-2. Render will automatically detect the changes and rebuild the application
-
-## Security Considerations
-
-1. Change the default password for all accounts after initial setup
-2. Use strong, unique passwords for all administrative accounts
-3. Consider implementing additional security measures for production environments
-4. Regularly back up your database
+1. Modify the schema in `shared/schema.ts`
+2. Update `storage.ts` accordingly
+3. Push changes to deploy automatically
 
 ## Support
 
-If you encounter issues with the deployment, check the following resources:
+For additional help:
 
-1. Render documentation: [docs.render.com](https://docs.render.com)
-2. Supabase documentation: [supabase.com/docs](https://supabase.com/docs)
-3. Project-specific documentation in the code repository
+- Review the application's README and documentation
+- Consult the Render documentation at https://render.com/docs
+- Consult the Supabase documentation at https://supabase.com/docs
+
+---
+
+© Student Performance Tracker

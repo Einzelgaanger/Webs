@@ -1,7 +1,5 @@
-
-[tools.run]
-start = ["./start_app.sh"]
-
-[tools.run.commands]
-Start_Application = "./start_app.sh"
-
+[application]
+name = "StudentPerformanceTracker"
+build_command = "echo 'No build step required'"
+run_command = "bash start_workflow.sh"
+onboot_command = "echo 'Application is booting up'"

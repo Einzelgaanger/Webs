@@ -1,12 +1,2 @@
-run = "./start_app.sh"
-
-[nix]
-channel = "stable-22_11"
-
-[deployment]
-run = "./start_app.sh"
-deploymentTarget = "cloudrun"
-
-[[ports]]
-localPort = 3000
-externalPort = 80
+[commands]
+run = ["sh", "-c", "./start_student_tracker.sh"]

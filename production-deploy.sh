@@ -50,4 +50,13 @@ chmod -R 755 uploads
 
 # 6. Start the server
 echo "Starting the server..."
-node StudentPerformanceTracker006/server/app.js
+if [[ -f "app.cjs" ]]; then
+  echo "Running the deployment-ready server (app.cjs)..."
+  node app.cjs
+elif [[ -f "StudentPerformanceTracker006/app.js" ]]; then
+  echo "Running the simple Express server..."
+  node StudentPerformanceTracker006/app.js
+else
+  echo "Trying the enhanced server..."
+  node StudentPerformanceTracker006/server/app.js
+fi
