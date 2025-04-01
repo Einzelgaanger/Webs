@@ -67,6 +67,13 @@ export interface IStorage {
   
   // Ranking methods
   getUnitRankings(unitCode: string): Promise<any[]>;
+  
+  // File methods
+  getFileById(fileId: number): Promise<any>;
+  
+  // Search methods
+  searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<any[]>;
+  getSearchSuggestions(partialQuery: string, userId: number): Promise<string[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -955,6 +962,56 @@ export class DatabaseStorage implements IStorage {
     });
     
     return rankings;
+  }
+  
+  // File methods
+  async getFileById(fileId: number): Promise<any> {
+    try {
+      // Import fileStorage schema on-demand to avoid circular dependency
+      const { fileStorage } = await import("@shared/schema");
+      
+      const [file] = await db
+        .select()
+        .from(fileStorage)
+        .where(eq(fileStorage.id, fileId));
+      
+      return file;
+    } catch (error) {
+      console.error('Error getting file by ID:', error);
+      return null;
+    }
+  }
+  
+  // Search methods
+  async searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<any[]> {
+    try {
+      // Use the specialized search module implementation
+      const { searchContent } = await import('./search');
+      
+      // Build search params
+      const searchParams = {
+        query: query,
+        type: type as any,
+        unitCode: unitCode
+      };
+      
+      return await searchContent(searchParams, userId || 0);
+    } catch (error) {
+      console.error('Error searching content:', error);
+      return [];
+    }
+  }
+  
+  async getSearchSuggestions(partialQuery: string, userId: number): Promise<string[]> {
+    try {
+      // Use the specialized search module implementation
+      const { getSearchSuggestions } = await import('./search');
+      
+      return await getSearchSuggestions(partialQuery, userId);
+    } catch (error) {
+      console.error('Error getting search suggestions:', error);
+      return [];
+    }
   }
 }
 

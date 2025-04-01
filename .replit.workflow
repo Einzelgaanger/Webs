@@ -1,5 +1,6 @@
-[StudentTracker]
-run = "bash start-tracker.sh"
-language = "nodejs"
-persistent = true
-onBoot = true
+[Start application]
+startCommand = ["sh", "./run.sh"]
+restartOn.fileChange = true
+restartOn.exit = true
+restartOn.startupError = true
+restartPolicy = "always"

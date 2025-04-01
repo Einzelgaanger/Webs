@@ -7,12 +7,14 @@ import { fromZodError } from "zod-validation-error";
 import {
   insertAssignmentSchema,
   insertNoteSchema,
-  insertPastPaperSchema
+  insertPastPaperSchema,
+  searchSchema
 } from "@shared/schema";
 import fs from "fs";
 import path from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
+import { searchContent, getSearchSuggestions } from "./search";
 
 // Patch to prevent path-to-regexp error with URLs containing colons
 process.env.DEBUG_URL = null; // Prevents the error by nullifying the debug URL
@@ -316,6 +318,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const rankings = await storage.getUnitRankings(req.params.unitCode);
       res.json(rankings);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  // Search routes
+  app.get("/api/search", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { query, type, unitCode } = req.query;
+      
+      if (!query || typeof query !== 'string' || query.trim().length === 0) {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+      
+      const validatedType = type && typeof type === 'string' ? 
+        ['all', 'notes', 'assignments', 'pastpapers'].includes(type) ? type : 'all' : 'all';
+      
+      const validatedUnitCode = unitCode && typeof unitCode === 'string' ? unitCode : undefined;
+      
+      const searchParams = {
+        query: query.trim(),
+        type: validatedType as any,
+        unitCode: validatedUnitCode
+      };
+      
+      const results = await searchContent(searchParams, req.user.id);
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  app.get("/api/search/suggestions", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const { q } = req.query;
+      
+      if (!q || typeof q !== 'string') {
+        return res.json([]);
+      }
+      
+      const suggestions = await getSearchSuggestions(q, req.user.id);
+      res.json(suggestions);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+  
+  // File Serving route
+  app.get("/api/files/:fileId", async (req, res) => {
+    if (!req.isAuthenticated()) return res.sendStatus(401);
+    
+    try {
+      const fileId = parseInt(req.params.fileId);
+      if (isNaN(fileId)) {
+        return res.status(400).json({ error: "Invalid file ID" });
+      }
+      
+      const file = await storage.getFileById(fileId);
+      if (!file) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
+      // Set appropriate content type
+      res.setHeader('Content-Type', file.mimeType);
+      
+      // Set cache headers for better performance
+      if (file.type === 'profile') {
+        res.setHeader('Cache-Control', 'public, max-age=86400'); // 24 hours
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=604800'); // 1 week
+      }
+      
+      // Set content disposition
+      res.setHeader('Content-Disposition', `inline; filename="${file.originalFilename}"`);
+      
+      // Send the file
+      res.sendFile(file.path);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }

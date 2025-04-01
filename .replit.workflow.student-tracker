@@ -1,0 +1,6 @@
+[Student Tracker]
+onBoot = false
+restartOn = { filesChange = ["*"] }
+startCommand = ["./run.sh"]
+show = true
+persistent = true
