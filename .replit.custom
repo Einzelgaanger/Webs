@@ -1,2 +1,12 @@
-[webview]
-port = 3000
+run = "./start_app.sh"
+
+[nix]
+channel = "stable-22_11"
+
+[deployment]
+run = "./start_app.sh"
+deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 3000
+externalPort = 80

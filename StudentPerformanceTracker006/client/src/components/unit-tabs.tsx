@@ -28,6 +28,13 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [currentTab, setCurrentTab] = useState("notes");
+  const [searchResults, setSearchResults] = useState<{
+    notes: Note[] | null;
+    assignments: Assignment[] | null;
+    pastPapers: PastPaper[] | null;
+  }>({ notes: null, assignments: null, pastPapers: null });
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // Fetch content for the tabs
   const { data: notes, isLoading: isLoadingNotes } = useQuery<Note[]>({
@@ -97,6 +104,39 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
     },
   });
 
+  // Effects for search functionality
+  useEffect(() => {
+    // Perform search across all content types when query changes
+    if (searchQuery.length > 1) {
+      setIsSearching(true);
+      
+      // Update search results
+      setSearchResults({
+        notes: notes?.filter(note => 
+          note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          note.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          note.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())
+        ) || null,
+        assignments: assignments?.filter(assignment => 
+          assignment.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          assignment.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          assignment.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase())
+        ) || null,
+        pastPapers: pastPapers?.filter(paper => 
+          paper.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          paper.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          paper.uploadedBy.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          paper.year.toString().includes(searchQuery)
+        ) || null
+      });
+      
+      setIsSearching(false);
+    } else if (searchQuery === "") {
+      // Reset search results when query is cleared
+      setSearchResults({ notes: null, assignments: null, pastPapers: null });
+    }
+  }, [searchQuery, notes, assignments, pastPapers]);
+
   // Track tab changes
   const handleTabChange = (value: string) => {
     setCurrentTab(value);
@@ -150,12 +190,14 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
         {/* Search bar for all except rankings */}
         {currentTab !== "rank" && (
           <div className="relative mb-4">
-            <div className="flex items-center bg-gray-50 border rounded-md focus-within:ring-2 focus-within:ring-primary transition-all">
+            <div className={`flex items-center bg-gray-50 border rounded-md ${searchFocused ? 'ring-2 ring-primary shadow-sm' : ''} transition-all`}>
               <Search className="ml-3 h-4 w-4 shrink-0 text-gray-500" />
               <Input 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => setSearchFocused(false)}
                 placeholder={`Search ${currentTab}...`}
                 className="flex w-full rounded-md border-0 bg-transparent py-2 text-sm focus:outline-none focus:ring-0 focus-visible:ring-0"
               />
@@ -169,11 +211,22 @@ export default function UnitTabs({ unitCode }: UnitTabsProps) {
                 </Button>
               )}
             </div>
+            
+            {/* Animated search results count */}
             {searchQuery && (
-              <div className="mt-1 text-xs text-gray-500">
-                {currentTab === "notes" && filteredNotes?.length} results found
-                {currentTab === "assignments" && filteredAssignments?.length} results found
-                {currentTab === "pastpapers" && filteredPastPapers?.length} results found
+              <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
+                <span className={`inline-block rounded-full w-2 h-2 ${
+                  isSearching ? 'bg-amber-500 animate-pulse' : 'bg-green-500'
+                }`}></span>
+                {currentTab === "notes" && (
+                  <span>{filteredNotes?.length || 0} note{filteredNotes?.length !== 1 ? "s" : ""} found</span>
+                )}
+                {currentTab === "assignments" && (
+                  <span>{filteredAssignments?.length || 0} assignment{filteredAssignments?.length !== 1 ? "s" : ""} found</span>
+                )}
+                {currentTab === "pastpapers" && (
+                  <span>{filteredPastPapers?.length || 0} past paper{filteredPastPapers?.length !== 1 ? "s" : ""} found</span>
+                )}
               </div>
             )}
           </div>

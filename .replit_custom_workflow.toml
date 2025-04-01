@@ -1,9 +1,7 @@
-[commands]
-student-tracker = "cd StudentPerformanceTracker006 && node app.cjs"
 
-[env]
-PORT = "3000"
+[tools.run]
+start = ["./start_app.sh"]
 
-[[ports]]
-localPort = 3000
-externalPort = 80
+[tools.run.commands]
+Start_Application = "./start_app.sh"
+

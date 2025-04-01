@@ -1,5 +1,179 @@
-[workflows.start-app]
-name = "Start App"
-onStart = "cd StudentPerformanceTracker006 && node app.cjs"
+[nix]
+channel = "stable-22_11"
+
+[tools]
+configopt = { "@replit/java-runner" = "latest" }
+node = "20.7.0"
+
+[deployment]
+run = ["sh", "-c", "bash launcher.sh"]
+
+[languages]
+nodejs = "20.7.0"
+python = "3.11.4"
+
+[unitTest]
 language = "nodejs"
+
+[auth]
+pageEnabled = true
+buttonEnabled = true
+
+[gitHubImport]
+requiredFiles = [".replit", "replit.nix", ".replit.custom_workflow.toml"]
+
+[deployment.ports]
+3000 = { scheme = "http", external = 3000 }
+
+[env]
+PORT = 3000
+
+[replit]
+build = { title = "Student Performance Tracker", build = "" }
+
+[debugger]
+support = true
+buttons = true
+
+[debugger.interactive]
+transport = "localhost:0"
+startCommand = ["dap-node"]
+
+[debugger.interactive.initializeMessage]
+command = "initialize"
+type = "request"
+
+[debugger.interactive.initializeMessage.arguments]
+clientID = "replit"
+clientName = "replit.com"
+columnsStartAt1 = true
+linesStartAt1 = true
+locale = "en-us"
+pathFormat = "path"
+supportsInvalidatedEvent = true
+supportsProgressReporting = true
+supportsRunInTerminalRequest = true
+supportsVariablePaging = true
+supportsVariableType = true
+
+[debugger.interactive.launchMessage]
+command = "launch"
+type = "request"
+
+[debugger.interactive.launchMessage.arguments]
+args = []
+console = "externalTerminal"
+cwd = "."
+environment = []
+pauseForSourceMap = false
+program = "./index.js"
+request = "launch"
+sourceMaps = true
+stopOnEntry = false
+type = "pwa-node"
+
+[packager]
+language = "nodejs"
+
+[packager.features]
+packageSearch = true
+guessImports = true
+enabledForHosting = false
+
+[interpreter]
+command = ["node", "index.js"]
+
+[interpreter.command]
+args = []
+
+[interpreter.run]
+command = ["node", "index.js"]
+
+[packager]
+language = "nodejs"
+
+[editor]
+format = true
+lineNumbers = true
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[hints]]
+regex = "(Error: .*Exception:)|(yarn audit found.*vulnerabilities)"
+message = "It looks like there was an error or vulnerability. Try running again or check your packages."
+
+[[customTheme]]
+name = "PurpleTracker"
+borderColor = "#7c3aed"
+linkColor = "#a78bfa"
+
+[[customTheme.theme]]
+background = "#1e293b"
+foreground = "#e2e8f0"
+cursor = "#a78bfa"
+cursorAccent = "#e2e8f0"
+selection = "#7c3aed66"
+black = "#111827"
+red = "#ef4444"
+green = "#10b981"
+yellow = "#f59e0b"
+blue = "#3b82f6"
+magenta = "#a855f7"
+cyan = "#06b6d4"
+white = "#e2e8f0"
+brightBlack = "#374151"
+brightRed = "#f87171"
+brightGreen = "#34d399"
+brightYellow = "#fbbf24"
+brightBlue = "#60a5fa"
+brightMagenta = "#c084fc"
+brightCyan = "#22d3ee"
+brightWhite = "#f8fafc"
+
+[commands]
+run = "bash ./start_app.sh"
+
+[persistentStorage]
+directories = ["./uploads"]
+
+[gitRunner]
+enabled = true
+
+[secrets]
+DATABASE_URL = { name = "DATABASE_URL", description = "PostgreSQL connection string for the database.", value = "", visible = false }
+
+[hosting]
+route = "/"
+directory = "client/dist"
+
+[[hosting.hooks]]
+name = "building"
+command = "cd StudentPerformanceTracker006 && npm run build"
+
+[[hosting.hooks]]
+name = "cleanup"
+command = "rm -rf ./.node_repl_history ./node_modules"
+
+[permissions]
+databases = true
+networking = true
+
+[hosting.health]
+path = "/"
+port = 3000
+timeout = 5
+
+[extension]
+isExtension = false
+
+[fileDialog]
+type = "open"
+
+[workflow]
+name = "Start Application"
+onBoot = true
+command = "bash launcher.sh"
 persistent = true
+restartOn = { edited = [".replit.custom_workflow.toml", "start_app.sh", "StudentPerformanceTracker006/start_app.sh"] }

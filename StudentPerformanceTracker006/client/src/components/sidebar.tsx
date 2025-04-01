@@ -136,6 +136,14 @@ const Sidebar = ({ isMobileMenuOpen, toggleMobileMenu }: SidebarProps) => {
               <span>{logoutMutation.isPending ? "Signing out..." : "Sign Out"}</span>
             </button>
           </div>
+          
+          {/* Developer Attribution */}
+          <div className="mt-10 p-4 border-t border-gray-200 text-center">
+            <p className="text-xs text-gray-500 flex items-center justify-center">
+              <span className="text-gray-400 mr-1">Built by</span>
+              <span className="font-bold text-gray-600">𝐌𝐚𝐯𝐞𝐫𝐢𝐜𝐤</span>
+            </p>
+          </div>
         </nav>
       </aside>
     </>
