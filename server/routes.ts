@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, RequestHandler } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -21,6 +21,13 @@ interface CustomSession extends Session {
   isAuthenticated?: boolean;
   user?: {
     id: number;
+    name: string;
+    admissionNumber: string;
+    password: string;
+    profileImageUrl: string | null;
+    rank: number | null;
+    role: string | null;
+    createdAt: Date;
   };
 }
 
@@ -30,6 +37,16 @@ interface CustomRequest extends Request {
   user: {
     id: number;
   };
+}
+
+interface FileStorageResponse {
+  id: number;
+  name: string;
+  url: string;
+  type: string;
+  path?: string;
+  originalFilename?: string;
+  mimeType?: string;
 }
 
 // Patch to prevent path-to-regexp error with URLs containing colons
@@ -407,6 +424,34 @@ export function setupRoutes(app: Express) {
       res.status(500).json({ error: (err as Error).message });
     }
   });
+
+  // Update the file upload handler
+  app.post("/api/upload", fileUpload.single('file'), (async (req: CustomRequest, res: Response) => {
+    if (!req.session.isAuthenticated) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+    
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+      
+      const file: FileStorageResponse = {
+        id: Date.now(), // Temporary ID
+        name: req.file.originalname,
+        url: `/uploads/files/${req.file.filename}`,
+        type: req.file.mimetype,
+        path: req.file.path,
+        originalFilename: req.file.originalname,
+        mimeType: req.file.mimetype
+      };
+      
+      return res.json(file);
+    } catch (error) {
+      console.error('File upload error:', error);
+      return res.status(500).json({ message: 'Internal server error' });
+    }
+  }) as RequestHandler);
 
   return app;
 }

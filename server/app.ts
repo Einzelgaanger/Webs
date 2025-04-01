@@ -505,7 +505,7 @@ const startApp = () => {
   
   // ========== SEARCH FUNCTIONALITY ==========
   
-  app.get("/api/search/:unitCode", async (req, res) => {
+  app.get("/api/search/:unitCode", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -516,44 +516,61 @@ const startApp = () => {
         return res.status(400).json({ error: "Search query is required" });
       }
       
-      const searchResults = {
-        notes: [],
-        assignments: [],
-        pastPapers: []
-      };
-      
       // Normalize the search query
       const searchQuery = query.toLowerCase().trim();
       
-      // Filter function for search
-      const matchesSearch = (item: any) => {
+      interface SearchableItem {
+        title: string;
+        description?: string;
+        unitCode?: string;
+      }
+
+      interface SearchResult {
+        title: string;
+        description?: string;
+        unitCode?: string;
+        type: 'note' | 'assignment' | 'past-paper';
+      }
+
+      const matchesSearch = (item: SearchableItem) => {
         return (
           (item.title && item.title.toLowerCase().includes(searchQuery)) || 
-          (item.description && item.description.toLowerCase().includes(searchQuery))
+          (item.description && item.description.toLowerCase().includes(searchQuery)) ||
+          (item.unitCode && item.unitCode.toLowerCase().includes(searchQuery))
         );
       };
       
-      // Search by type or search all types if not specified
+      const results: SearchResult[] = [];
+
       if (!type || type === 'notes') {
-        const notes = await storage.getNotesByUnit(unitCode, req.user.id);
-        searchResults.notes = notes.filter(matchesSearch);
+        const noteResults = await storage.getNotesByUnit(unitCode, req.user.id);
+        results.push(...noteResults.map(note => ({
+          ...note,
+          type: 'note' as const
+        })));
       }
       
       if (!type || type === 'assignments') {
-        const assignments = await storage.getAssignmentsByUnit(unitCode, req.user.id);
-        searchResults.assignments = assignments.filter(matchesSearch);
+        const assignmentResults = await storage.getAssignmentsByUnit(unitCode, req.user.id);
+        results.push(...assignmentResults.map(assignment => ({
+          ...assignment,
+          type: 'assignment' as const
+        })));
       }
       
-      if (!type || type === 'pastPapers') {
-        const pastPapers = await storage.getPastPapersByUnit(unitCode, req.user.id);
-        searchResults.pastPapers = pastPapers.filter(matchesSearch);
+      if (!type || type === 'past-papers') {
+        const paperResults = await storage.getPastPapersByUnit(unitCode, req.user.id);
+        results.push(...paperResults.map(paper => ({
+          ...paper,
+          type: 'past-paper' as const
+        })));
       }
       
-      res.json(searchResults);
+      res.json(results);
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
   // ========== ERROR HANDLING ==========
   
@@ -569,9 +586,9 @@ const startApp = () => {
   });
   
   // Start server
-  const PORT = process.env.PORT || 3000;
-  const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server is running on http://0.0.0.0:${PORT}`);
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const server = app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
   });
   
   return server;

@@ -8,6 +8,9 @@ import pkg from 'pg';
 const { Pool } = pkg;
 import { Request, Response } from 'express';
 import { Session } from 'express-session';
+import { db } from './db';
+import { notes, assignments, pastPapers, units } from './schema';
+import { eq, like, or, and } from 'drizzle-orm';
 
 interface CustomSession extends Session {
   isAuthenticated?: boolean;
@@ -25,6 +28,14 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
+
+export interface SearchResult {
+  id: number;
+  type: string;
+  title: string;
+  unitCode: string;
+  url?: string;
+}
 
 /**
  * Record a search query
@@ -48,120 +59,96 @@ export async function recordSearchQuery(userId: number, query: string, resultCou
  * Search for content across notes, assignments, and past papers
  * 
  * @param query Search query
- * @param userId User ID
+ * @param type Optional content type to filter by ('notes', 'assignments', 'papers')
  * @param unitCode Optional unit code to filter by
- * @param contentType Optional content type to filter by ('notes', 'assignments', 'papers')
- * @param limit Maximum number of results to return
+ * @param userId Optional user ID to filter by
  */
 export async function searchContent(
-  query: string, 
-  userId: number, 
-  unitCode?: string, 
-  contentType?: string,
-  limit: number = 20
-): Promise<any[]> {
+  query: string,
+  type?: string,
+  unitCode?: string,
+  userId?: number
+): Promise<SearchResult[]> {
   try {
-    // Basic sanitization
-    const searchTerm = query.replace(/[^\w\s]/gi, '').trim();
-    if (!searchTerm) {
-      return [];
+    let results: SearchResult[] = [];
+
+    // Build base conditions
+    const conditions = [
+      or(
+        like(notes.title, `%${query}%`),
+        like(assignments.title, `%${query}%`),
+        like(pastPapers.title, `%${query}%`)
+      )
+    ];
+
+    if (unitCode) {
+      conditions.push(eq(units.code, unitCode));
     }
-    
-    // Build search conditions
-    const unitCondition = unitCode ? `AND unit_code = '${unitCode}'` : '';
-    
-    // Build search patterns for SQL LIKE
-    const searchPattern = `%${searchTerm.toLowerCase()}%`;
-    
-    let results: any[] = [];
-    
-    // Search in notes
-    if (!contentType || contentType === 'notes') {
-      const notesQuery = `
-        SELECT 
-          id, 
-          title, 
-          description, 
-          file_url, 
-          unit_code AS unitCode, 
-          user_id AS userId, 
-          created_at AS createdAt,
-          'note' AS type
-        FROM 
-          notes 
-        WHERE 
-          (LOWER(title) LIKE $1 OR LOWER(description) LIKE $1)
-          ${unitCondition}
-        ORDER BY 
-          created_at DESC
-        LIMIT $2
-      `;
-      
-      const notesResult = await pool.query(notesQuery, [searchPattern, limit]);
-      results = [...results, ...notesResult.rows];
+
+    if (userId) {
+      conditions.push(eq(notes.userId, userId));
     }
-    
-    // Search in assignments
-    if (!contentType || contentType === 'assignments') {
-      const assignmentsQuery = `
-        SELECT 
-          id, 
-          title, 
-          description, 
-          file_url, 
-          unit_code AS unitCode, 
-          user_id AS userId, 
-          deadline,
-          created_at AS createdAt,
-          'assignment' AS type
-        FROM 
-          assignments 
-        WHERE 
-          (LOWER(title) LIKE $1 OR LOWER(description) LIKE $1)
-          ${unitCondition}
-        ORDER BY 
-          deadline ASC
-        LIMIT $2
-      `;
-      
-      const assignmentsResult = await pool.query(assignmentsQuery, [searchPattern, limit]);
-      results = [...results, ...assignmentsResult.rows];
+
+    // Search notes if no type specified or type is 'notes'
+    if (!type || type === 'notes') {
+      const noteResults = await db
+        .select({
+          id: notes.id,
+          title: notes.title,
+          unitCode: notes.unitCode,
+          url: notes.fileUrl
+        })
+        .from(notes)
+        .where(and(...conditions));
+
+      results.push(...noteResults.map(note => ({
+        ...note,
+        type: 'note'
+      })));
     }
-    
-    // Search in past papers
-    if (!contentType || contentType === 'papers') {
-      const papersQuery = `
-        SELECT 
-          id, 
-          title, 
-          description, 
-          file_url, 
-          unit_code AS unitCode, 
-          user_id AS userId, 
-          year,
-          created_at AS createdAt,
-          'paper' AS type
-        FROM 
-          past_papers 
-        WHERE 
-          (LOWER(title) LIKE $1 OR LOWER(description) LIKE $1)
-          ${unitCondition}
-        ORDER BY 
-          year DESC
-        LIMIT $2
-      `;
-      
-      const papersResult = await pool.query(papersQuery, [searchPattern, limit]);
-      results = [...results, ...papersResult.rows];
+
+    // Search assignments if no type specified or type is 'assignments'
+    if (!type || type === 'assignments') {
+      const assignmentResults = await db
+        .select({
+          id: assignments.id,
+          title: assignments.title,
+          unitCode: assignments.unitCode
+        })
+        .from(assignments)
+        .where(and(...conditions));
+
+      results.push(...assignmentResults.map(assignment => ({
+        ...assignment,
+        type: 'assignment'
+      })));
     }
-    
+
+    // Search past papers if no type specified or type is 'past-papers'
+    if (!type || type === 'past-papers') {
+      const paperResults = await db
+        .select({
+          id: pastPapers.id,
+          title: pastPapers.title,
+          unitCode: pastPapers.unitCode,
+          url: pastPapers.fileUrl
+        })
+        .from(pastPapers)
+        .where(and(...conditions));
+
+      results.push(...paperResults.map(paper => ({
+        ...paper,
+        type: 'past-paper'
+      })));
+    }
+
     // Record the search
-    await recordSearchQuery(userId, query, results.length);
+    await recordSearchQuery(userId || 0, query, results.length);
     
     return results;
   } catch (error) {
-    console.error('Search error:', error);
-    return [];
+    console.error('Error searching content:', error);
+    throw error;
   }
 }
 
@@ -222,10 +209,9 @@ export async function handleSearch(req: CustomRequest, res: Response): Promise<R
     
     const results = await searchContent(
       query,
-      userId,
-      typeof unitCode === 'string' ? unitCode : undefined,
       typeof contentType === 'string' ? contentType : undefined,
-      typeof limit === 'string' ? parseInt(limit, 10) : 20
+      typeof unitCode === 'string' ? unitCode : undefined,
+      userId
     );
     
     return res.json({ results });

@@ -103,7 +103,10 @@ export interface IStorage {
     name: string;
     url: string;
     type: string;
-  }>;
+    path?: string;
+    originalFilename?: string;
+    mimeType?: string;
+  } | null>;
   
   // Search methods
   searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<{
@@ -114,6 +117,14 @@ export interface IStorage {
     url?: string;
   }[]>;
   getSearchSuggestions(partialQuery: string, userId: number): Promise<string[]>;
+}
+
+interface RecentActivity {
+  id: number;
+  title: string;
+  type: 'note' | 'assignment' | 'past-paper';
+  type: 'assignment' | 'note' | 'past-paper';
+  timestamp: Date;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -388,6 +399,12 @@ export class DatabaseStorage implements IStorage {
     
     // Get user rank
     const userRank = await this.getUserRank(userId);
+    
+    // Count completed assignments
+    const [completedAssignmentsResult] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(completedAssignments)
+      .where(eq(completedAssignments.userId, userId));
     
     return {
       totalNotes: notesResult.count,
@@ -779,7 +796,18 @@ export class DatabaseStorage implements IStorage {
       );
     
     if (existingCompletion) {
-      return { alreadyCompleted: true };
+      // Return a properly typed Assignment object
+      const [assignment] = await db
+        .select()
+        .from(assignments)
+        .where(eq(assignments.id, assignmentId));
+        
+      return {
+        ...assignment,
+        uploadedBy: 'System',
+        completed: true,
+        completedAt: existingCompletion.completedAt
+      };
     }
     
     const completedAt = new Date();
@@ -806,9 +834,10 @@ export class DatabaseStorage implements IStorage {
     await this.updateUserRank(userId);
     
     return {
-      ...completion,
-      assignment,
-      user
+      ...assignment,
+      uploadedBy: user.name,
+      completed: true,
+      completedAt
     };
   }
   
@@ -1060,9 +1089,11 @@ export class DatabaseStorage implements IStorage {
     name: string;
     url: string;
     type: string;
-  }> {
+    path?: string;
+    originalFilename?: string;
+    mimeType?: string;
+  } | null> {
     try {
-      // Import fileStorage schema on-demand to avoid circular dependency
       const { fileStorage } = await import("@shared/schema");
       
       const [file] = await db
@@ -1070,11 +1101,16 @@ export class DatabaseStorage implements IStorage {
         .from(fileStorage)
         .where(eq(fileStorage.id, fileId));
       
+      if (!file) return null;
+      
       return {
         id: file.id,
-        name: file.name,
-        url: file.url,
-        type: file.type
+        name: file.originalFilename,
+        url: file.path,
+        type: file.mimeType,
+        path: file.path,
+        originalFilename: file.originalFilename,
+        mimeType: file.mimeType
       };
     } catch (error) {
       console.error('Error getting file by ID:', error);
@@ -1091,16 +1127,7 @@ export class DatabaseStorage implements IStorage {
     url?: string;
   }[]> {
     try {
-      // Use the specialized search module implementation
       const { searchContent } = await import('./search');
-      
-      // Build search params
-      const searchParams = {
-        query: query,
-        type: type as any,
-        unitCode: unitCode
-      };
-      
       return await searchContent(query, userId || 0, unitCode, type);
     } catch (error) {
       console.error('Error searching content:', error);
@@ -1118,6 +1145,16 @@ export class DatabaseStorage implements IStorage {
       console.error('Error getting search suggestions:', error);
       return [];
     }
+  }
+
+  async getRecentCompletions(userId: number): Promise<RecentCompletion[]> {
+    // ... existing code ...
+    return recentCompletions.map(completion => ({
+      id: completion.id,
+      title: completion.title,
+      type: completion.type as 'assignment' | 'note' | 'past-paper',
+      timestamp: completion.timestamp
+    }));
   }
 }
 
