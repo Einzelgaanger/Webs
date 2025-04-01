@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
@@ -15,6 +15,22 @@ import path from "path";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
 import { searchContent, getSearchSuggestions } from "./search";
+import { Session } from "express-session";
+
+interface CustomSession extends Session {
+  isAuthenticated?: boolean;
+  user?: {
+    id: number;
+  };
+}
+
+interface CustomRequest extends Request {
+  session: CustomSession;
+  isAuthenticated(): boolean;
+  user: {
+    id: number;
+  };
+}
 
 // Patch to prevent path-to-regexp error with URLs containing colons
 process.env.DEBUG_URL = null; // Prevents the error by nullifying the debug URL
@@ -324,46 +340,34 @@ export function setupRoutes(app: Express) {
   });
 
   // Search routes
-  app.get("/api/search", async (req, res) => {
+  app.get("/api/search", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
-      const { query, type, unitCode } = req.query;
-      
-      if (!query || typeof query !== 'string' || query.trim().length === 0) {
-        return res.status(400).json({ error: "Search query is required" });
+      const result = searchSchema.safeParse(req.query);
+      if (!result.success) {
+        return res.status(400).json({ error: fromZodError(result.error).message });
       }
-      
-      const validatedType = type && typeof type === 'string' ? 
-        ['all', 'notes', 'assignments', 'pastpapers'].includes(type) ? type : 'all' : 'all';
-      
-      const validatedUnitCode = unitCode && typeof unitCode === 'string' ? unitCode : undefined;
-      
-      const searchParams = {
-        query: query.trim(),
-        type: validatedType as any,
-        unitCode: validatedUnitCode
-      };
-      
-      const results = await searchContent(searchParams, req.user.id);
-      res.json(results);
+
+      const { query, type, unitCode } = result.data;
+      const results = await searchContent(query, req.user.id, unitCode, type);
+      res.json({ results });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
   });
 
-  app.get("/api/search/suggestions", async (req, res) => {
+  app.get("/api/search/suggestions", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
-      const { q } = req.query;
-      
-      if (!q || typeof q !== 'string') {
-        return res.json([]);
+      const { query } = req.query;
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Query parameter is required" });
       }
-      
-      const suggestions = await getSearchSuggestions(q, req.user.id);
-      res.json(suggestions);
+
+      const suggestions = await getSearchSuggestions(query);
+      res.json({ suggestions });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }

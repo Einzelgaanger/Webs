@@ -4,7 +4,7 @@
  * This module sets up the Express server with error handling for path-to-regexp issues
  */
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import { json, urlencoded } from 'express';
 import path from 'path';
@@ -24,6 +24,25 @@ import {
   passwordUpdateSchema,
   forgotPasswordSchema
 } from '../shared/schema';
+
+interface CustomSession extends Session {
+  isAuthenticated?: boolean;
+  user?: {
+    id: number;
+    password?: string;
+    profileImageUrl?: string | null;
+  };
+}
+
+interface CustomRequest extends Request {
+  session: CustomSession;
+  isAuthenticated(): boolean;
+  user: {
+    id: number;
+    password?: string;
+    profileImageUrl?: string | null;
+  };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -62,24 +81,24 @@ async function startApp() {
   
   // ========== AUTH ROUTES ==========
   
-  app.post("/api/login", passport.authenticate("local"), (req, res) => {
+  app.post("/api/login", passport.authenticate("local"), (req: CustomRequest, res: Response) => {
     res.status(200).json(req.user);
   });
 
-  app.post("/api/logout", (req, res, next) => {
+  app.post("/api/logout", (req: CustomRequest, res: Response, next: NextFunction) => {
     req.logout((err) => {
       if (err) return next(err);
       res.sendStatus(200);
     });
   });
 
-  app.get("/api/user", (req, res) => {
+  app.get("/api/user", (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
   });
   
   // Update password
-  app.patch("/api/user/password", async (req, res, next) => {
+  app.patch("/api/user/password", async (req: CustomRequest, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -126,7 +145,7 @@ async function startApp() {
   });
   
   // Forgot Password
-  app.post("/api/forgot-password", async (req, res, next) => {
+  app.post("/api/forgot-password", async (req: CustomRequest, res: Response, next: NextFunction) => {
     try {
       const result = forgotPasswordSchema.safeParse(req.body);
       if (!result.success) {
@@ -164,7 +183,7 @@ async function startApp() {
   });
   
   // Profile image upload
-  app.post("/api/user/profile-image", profileUpload.single('image'), async (req, res, next) => {
+  app.post("/api/user/profile-image", profileUpload.single('image'), async (req: CustomRequest, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -186,7 +205,7 @@ async function startApp() {
   
   // ========== DASHBOARD ROUTES ==========
   
-  app.get("/api/dashboard/stats", async (req, res) => {
+  app.get("/api/dashboard/stats", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -197,7 +216,7 @@ async function startApp() {
     }
   });
 
-  app.get("/api/dashboard/activities", async (req, res) => {
+  app.get("/api/dashboard/activities", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -208,7 +227,7 @@ async function startApp() {
     }
   });
 
-  app.get("/api/dashboard/deadlines", async (req, res) => {
+  app.get("/api/dashboard/deadlines", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -221,7 +240,7 @@ async function startApp() {
   
   // ========== UNIT ROUTES ==========
   
-  app.get("/api/units", async (req, res) => {
+  app.get("/api/units", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -232,7 +251,7 @@ async function startApp() {
     }
   });
 
-  app.get("/api/units/:unitCode", async (req, res) => {
+  app.get("/api/units/:unitCode", async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {

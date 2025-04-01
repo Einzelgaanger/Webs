@@ -7,6 +7,18 @@
 import pkg from 'pg';
 const { Pool } = pkg;
 import { Request, Response } from 'express';
+import { Session } from 'express-session';
+
+interface CustomSession extends Session {
+  isAuthenticated?: boolean;
+  user?: {
+    id: number;
+  };
+}
+
+interface CustomRequest extends Request {
+  session: CustomSession;
+}
 
 // Create a connection pool
 const pool = new Pool({
@@ -191,7 +203,7 @@ export async function getSearchSuggestions(query: string, limit: number = 5): Pr
  * @param req Express request
  * @param res Express response
  */
-export async function handleSearch(req: Request, res: Response): Promise<Response | undefined> {
+export async function handleSearch(req: CustomRequest, res: Response): Promise<Response | undefined> {
   try {
     if (!req.session.isAuthenticated) {
       return res.status(401).json({ message: 'Authentication required' });
@@ -229,7 +241,7 @@ export async function handleSearch(req: Request, res: Response): Promise<Respons
  * @param req Express request
  * @param res Express response
  */
-export async function handleSearchSuggestions(req: Request, res: Response): Promise<Response | undefined> {
+export async function handleSearchSuggestions(req: CustomRequest, res: Response): Promise<Response | undefined> {
   try {
     if (!req.session.isAuthenticated) {
       return res.status(401).json({ message: 'Authentication required' });

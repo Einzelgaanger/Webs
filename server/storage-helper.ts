@@ -1,29 +1,33 @@
-/**
- * Supabase Storage Helper Functions
- * 
- * This file provides utilities for uploading files to Supabase Storage.
- * It replaces the local file storage previously used in the application.
- */
+import fs from 'fs';
+import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
-const fs = require('fs');
-const path = require('path');
-const supabase = require('./supabase');
+interface MulterFile {
+  path: string;
+  originalname: string;
+  mimetype: string;
+}
+
+const supabase = createClient(
+  process.env.SUPABASE_URL || '',
+  process.env.SUPABASE_ANON_KEY || ''
+);
 
 /**
  * Upload a file to Supabase Storage
  * 
- * @param {Object} file - The file object from multer
- * @param {string} bucket - The Supabase storage bucket name ('profiles' or 'files')
- * @param {string} folder - Optional subfolder within the bucket
- * @returns {Promise<string>} - URL of the uploaded file
+ * @param file - The file object from multer
+ * @param bucket - The Supabase storage bucket name ('profiles' or 'files')
+ * @param folder - Optional subfolder within the bucket
+ * @returns URL of the uploaded file
  */
-async function uploadFileToSupabase(file, bucket, folder = '') {
+async function uploadFileToSupabase(file: MulterFile, bucket: string, folder = ''): Promise<string> {
   try {
     // Read the file from the temporary location where multer saved it
     const fileBuffer = fs.readFileSync(file.path);
     
     // Create a unique filename to avoid collisions
-    const fileName = `${Date.now()}_${path.basename(file.originalname || 'file')}`;
+    const fileName = `${Date.now()}_${path.basename(file.originalname)}`;
     const filePath = folder ? `${folder}/${fileName}` : fileName;
     
     // Upload the file to Supabase Storage
@@ -61,24 +65,25 @@ async function uploadFileToSupabase(file, bucket, folder = '') {
 /**
  * Upload a profile image to Supabase Storage
  * 
- * @param {Object} file - The file object from multer
- * @returns {Promise<string>} - URL of the uploaded profile image
+ * @param file - The file object from multer
+ * @returns URL of the uploaded profile image
  */
-async function uploadProfileImage(file) {
+async function uploadProfileImage(file: MulterFile): Promise<string> {
   return uploadFileToSupabase(file, 'profiles');
 }
 
 /**
  * Upload a document file to Supabase Storage
  * 
- * @param {Object} file - The file object from multer
- * @returns {Promise<string>} - URL of the uploaded file
+ * @param file - The file object from multer
+ * @returns URL of the uploaded file
  */
-async function uploadFile(file) {
+async function uploadFile(file: MulterFile): Promise<string> {
   return uploadFileToSupabase(file, 'files');
 }
 
-module.exports = {
+export {
   uploadProfileImage,
-  uploadFile
-};
+  uploadFile,
+  MulterFile
+}; 

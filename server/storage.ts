@@ -36,7 +36,7 @@ export interface IStorage {
   sessionStore: session.Store;
   
   // User methods
-  getUser(id: number): Promise<User | undefined>;
+  getUser(id: number): Promise<User>;
   getUserByCredentials(name: string, admissionNumber: string): Promise<User | undefined>;
   updateUserPassword(id: number, hashedPassword: string): Promise<User>;
   updateUserProfileImage(id: number, imageUrl: string): Promise<User>;
@@ -138,8 +138,11 @@ export class DatabaseStorage implements IStorage {
   }
   
   // User methods
-  async getUser(id: number): Promise<User | undefined> {
+  async getUser(id: number): Promise<User> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
+    if (!user) {
+      throw new Error(`User with id ${id} not found`);
+    }
     return user;
   }
   
@@ -240,6 +243,9 @@ export class DatabaseStorage implements IStorage {
       .set({ password: hashedPassword })
       .where(eq(users.id, id))
       .returning();
+    if (!updatedUser) {
+      throw new Error(`User with id ${id} not found`);
+    }
     return updatedUser;
   }
   
@@ -249,6 +255,9 @@ export class DatabaseStorage implements IStorage {
       .set({ profileImageUrl: imageUrl })
       .where(eq(users.id, id))
       .returning();
+    if (!updatedUser) {
+      throw new Error(`User with id ${id} not found`);
+    }
     return updatedUser;
   }
   
