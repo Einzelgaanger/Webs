@@ -4,8 +4,8 @@
  * This module sets up the Express server with error handling for path-to-regexp issues
  */
 
-import express, { Request, Response, NextFunction } from 'express';
-import session from 'express-session';
+import express, { Request, Response, NextFunction, RequestHandler } from 'express';
+import session, { Session } from 'express-session';
 import { json, urlencoded } from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -25,24 +25,31 @@ import {
   forgotPasswordSchema
 } from '../shared/schema';
 
-interface CustomSession extends Session {
-  isAuthenticated?: boolean;
-  user?: {
-    id: number;
-    password?: string;
-    profileImageUrl?: string | null;
-  };
+// Extend Express.Request to include authenticated user properties
+declare global {
+  namespace Express {
+    interface User {
+      id: number;
+      name: string;
+      admissionNumber: string;
+      password: string;
+      profileImageUrl: string | null;
+      rank: number | null;
+      role: string | null;
+    }
+  }
 }
 
-interface CustomRequest extends Request {
-  session: CustomSession;
+type RequestWithAuth = Request & {
+  user: Express.User;
   isAuthenticated(): boolean;
-  user: {
-    id: number;
-    password?: string;
-    profileImageUrl?: string | null;
-  };
-}
+};
+
+type AuthHandler = (
+  req: RequestWithAuth,
+  res: Response,
+  next?: NextFunction
+) => Promise<void | Response> | void;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -58,7 +65,7 @@ async function testDatabase() {
   }
 }
 
-async function startApp() {
+const startApp = () => {
   const app = express();
   
   // Basic middleware
@@ -81,24 +88,24 @@ async function startApp() {
   
   // ========== AUTH ROUTES ==========
   
-  app.post("/api/login", passport.authenticate("local"), (req: CustomRequest, res: Response) => {
+  app.post("/api/login", passport.authenticate("local"), ((req: RequestWithAuth, res: Response) => {
     res.status(200).json(req.user);
-  });
+  }) as RequestHandler);
 
-  app.post("/api/logout", (req: CustomRequest, res: Response, next: NextFunction) => {
+  app.post("/api/logout", ((req: RequestWithAuth, res: Response, next: NextFunction) => {
     req.logout((err) => {
       if (err) return next(err);
       res.sendStatus(200);
     });
-  });
+  }) as RequestHandler);
 
-  app.get("/api/user", (req: CustomRequest, res: Response) => {
+  app.get("/api/user", ((req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     res.json(req.user);
-  });
+  }) as RequestHandler);
   
   // Update password
-  app.patch("/api/user/password", async (req: CustomRequest, res: Response, next: NextFunction) => {
+  app.patch("/api/user/password", (async (req: RequestWithAuth, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -142,10 +149,10 @@ async function startApp() {
     } catch (err) {
       next(err);
     }
-  });
+  }) as RequestHandler);
   
   // Forgot Password
-  app.post("/api/forgot-password", async (req: CustomRequest, res: Response, next: NextFunction) => {
+  app.post("/api/forgot-password", (async (req: RequestWithAuth, res: Response, next: NextFunction) => {
     try {
       const result = forgotPasswordSchema.safeParse(req.body);
       if (!result.success) {
@@ -180,10 +187,10 @@ async function startApp() {
       console.error('Error in forgot password:', err);
       next(err);
     }
-  });
+  }) as RequestHandler);
   
   // Profile image upload
-  app.post("/api/user/profile-image", profileUpload.single('image'), async (req: CustomRequest, res: Response, next: NextFunction) => {
+  app.post("/api/user/profile-image", profileUpload.single('image'), (async (req: RequestWithAuth, res: Response, next: NextFunction) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -201,11 +208,11 @@ async function startApp() {
     } catch (err) {
       next(err);
     }
-  });
+  }) as RequestHandler);
   
   // ========== DASHBOARD ROUTES ==========
   
-  app.get("/api/dashboard/stats", async (req: CustomRequest, res: Response) => {
+  app.get("/api/dashboard/stats", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -214,9 +221,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.get("/api/dashboard/activities", async (req: CustomRequest, res: Response) => {
+  app.get("/api/dashboard/activities", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -225,9 +232,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.get("/api/dashboard/deadlines", async (req: CustomRequest, res: Response) => {
+  app.get("/api/dashboard/deadlines", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -236,11 +243,11 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
   // ========== UNIT ROUTES ==========
   
-  app.get("/api/units", async (req: CustomRequest, res: Response) => {
+  app.get("/api/units", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -249,9 +256,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.get("/api/units/:unitCode", async (req: CustomRequest, res: Response) => {
+  app.get("/api/units/:unitCode", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -263,11 +270,11 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
   // ========== NOTES ROUTES ==========
   
-  app.get("/api/units/:unitCode/notes", async (req, res) => {
+  app.get("/api/units/:unitCode/notes", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -276,9 +283,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.post("/api/units/:unitCode/notes", fileUpload.single('file'), async (req, res) => {
+  app.post("/api/units/:unitCode/notes", fileUpload.single('file'), (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -300,9 +307,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.post("/api/units/:unitCode/notes/:noteId/view", async (req, res) => {
+  app.post("/api/units/:unitCode/notes/:noteId/view", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -312,9 +319,9 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
-  app.delete("/api/units/:unitCode/notes/:noteId", async (req, res) => {
+  app.delete("/api/units/:unitCode/notes/:noteId", (async (req: RequestWithAuth, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -327,7 +334,7 @@ async function startApp() {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
   // ========== ASSIGNMENT ROUTES ==========
   
@@ -550,18 +557,15 @@ async function startApp() {
   
   // ========== ERROR HANDLING ==========
   
-  // Handle 404 errors
-  app.use((req, res) => {
-    res.status(404).json({ error: "Route not found" });
+  // Global error handler
+  app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+    console.error('Error:', err);
+    res.status(500).json({ error: err.message });
   });
   
-  // Global error handler
-  app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({
-      error: err.message || 'An unexpected error occurred',
-      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
-    });
+  // 404 handler
+  app.use((req: Request, res: Response) => {
+    res.status(404).json({ error: 'Not Found' });
   });
   
   // Start server
@@ -573,4 +577,4 @@ async function startApp() {
   return server;
 }
 
-export default startApp;
+export { startApp };

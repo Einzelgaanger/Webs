@@ -42,40 +42,77 @@ export interface IStorage {
   updateUserProfileImage(id: number, imageUrl: string): Promise<User>;
   
   // Dashboard methods
-  getDashboardStats(userId: number): Promise<any>;
-  getUserActivities(userId: number): Promise<any[]>;
-  getUpcomingDeadlines(userId: number): Promise<any[]>;
+  getDashboardStats(userId: number): Promise<{
+    totalNotes: number;
+    totalAssignments: number;
+    totalPastPapers: number;
+    completedAssignments: number;
+    rank: number;
+    recentActivity: {
+      type: string;
+      title: string;
+      date: string;
+    }[];
+  }>;
+  getUserActivities(userId: number): Promise<{
+    type: string;
+    title: string;
+    date: string;
+  }[]>;
+  getUpcomingDeadlines(userId: number): Promise<{
+    id: number;
+    title: string;
+    dueDate: string;
+    unitCode: string;
+    isCompleted: boolean;
+  }[]>;
   
   // Unit methods
-  getAllUnits(userId: number): Promise<any[]>;
+  getAllUnits(userId: number): Promise<Unit[]>;
   getUnitByCode(unitCode: string): Promise<Unit | undefined>;
   
   // Notes methods
-  getNotesByUnit(unitCode: string, userId: number): Promise<any[]>;
-  createNote(data: InsertNote & { userId: number }): Promise<any>;
-  deleteNote(noteId: number, userId: number): Promise<any | null>;
+  getNotesByUnit(unitCode: string, userId: number): Promise<Note[]>;
+  createNote(data: InsertNote & { userId: number }): Promise<Note>;
+  deleteNote(noteId: number, userId: number): Promise<Note | null>;
   markNoteAsViewed(noteId: number, userId: number): Promise<void>;
   
   // Assignment methods
-  getAssignmentsByUnit(unitCode: string, userId: number): Promise<any[]>;
-  createAssignment(data: InsertAssignment & { userId: number }): Promise<any>;
-  deleteAssignment(assignmentId: number, userId: number): Promise<any | null>;
-  completeAssignment(assignmentId: number, userId: number): Promise<any>;
+  getAssignmentsByUnit(unitCode: string, userId: number): Promise<Assignment[]>;
+  createAssignment(data: InsertAssignment & { userId: number }): Promise<Assignment>;
+  deleteAssignment(assignmentId: number, userId: number): Promise<Assignment | null>;
+  completeAssignment(assignmentId: number, userId: number): Promise<Assignment>;
   
   // Past papers methods
-  getPastPapersByUnit(unitCode: string, userId: number): Promise<any[]>;
-  createPastPaper(data: InsertPastPaper & { userId: number }): Promise<any>;
-  deletePastPaper(paperId: number, userId: number): Promise<any | null>;
+  getPastPapersByUnit(unitCode: string, userId: number): Promise<PastPaper[]>;
+  createPastPaper(data: InsertPastPaper & { userId: number }): Promise<PastPaper>;
+  deletePastPaper(paperId: number, userId: number): Promise<PastPaper | null>;
   markPastPaperAsViewed(paperId: number, userId: number): Promise<void>;
   
   // Ranking methods
-  getUnitRankings(unitCode: string): Promise<any[]>;
+  getUnitRankings(unitCode: string): Promise<{
+    userId: number;
+    name: string;
+    rank: number;
+    score: number;
+  }[]>;
   
   // File methods
-  getFileById(fileId: number): Promise<any>;
+  getFileById(fileId: number): Promise<{
+    id: number;
+    name: string;
+    url: string;
+    type: string;
+  }>;
   
   // Search methods
-  searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<any[]>;
+  searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<{
+    id: number;
+    type: string;
+    title: string;
+    unitCode: string;
+    url?: string;
+  }[]>;
   getSearchSuggestions(partialQuery: string, userId: number): Promise<string[]>;
 }
 
@@ -262,7 +299,18 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Dashboard methods
-  async getDashboardStats(userId: number): Promise<any> {
+  async getDashboardStats(userId: number): Promise<{
+    totalNotes: number;
+    totalAssignments: number;
+    totalPastPapers: number;
+    completedAssignments: number;
+    rank: number;
+    recentActivity: {
+      type: string;
+      title: string;
+      date: string;
+    }[];
+  }> {
     // Count unread notes
     const [notesResult] = await db
       .select({ count: sql<number>`count(*)` })
@@ -342,12 +390,12 @@ export class DatabaseStorage implements IStorage {
     const userRank = await this.getUserRank(userId);
     
     return {
-      assignmentsCount: assignmentsResult.count,
-      notesCount: notesResult.count,
-      pastPapersCount: pastPapersResult.count,
+      totalNotes: notesResult.count,
+      totalAssignments: assignmentsResult.count,
+      totalPastPapers: pastPapersResult.count,
+      completedAssignments: completedAssignmentsResult.count,
       rank: userRank,
-      overdue: overdueResult.count,
-      pending: pendingResult.count
+      recentActivity: []
     };
   }
   
@@ -357,7 +405,11 @@ export class DatabaseStorage implements IStorage {
     return 3;
   }
   
-  async getUserActivities(userId: number): Promise<any[]> {
+  async getUserActivities(userId: number): Promise<{
+    type: string;
+    title: string;
+    date: string;
+  }[]> {
     // Get the most recent activities (completed assignments, viewed notes, etc.)
     const completedAssignmentsActivity = await db
       .select({
@@ -409,10 +461,20 @@ export class DatabaseStorage implements IStorage {
     ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10);
     
-    return allActivities;
+    return allActivities.map((activity) => ({
+      type: activity.type,
+      title: activity.title,
+      date: formatDistance(new Date(activity.timestamp), new Date())
+    }));
   }
   
-  async getUpcomingDeadlines(userId: number): Promise<any[]> {
+  async getUpcomingDeadlines(userId: number): Promise<{
+    id: number;
+    title: string;
+    dueDate: string;
+    unitCode: string;
+    isCompleted: boolean;
+  }[]> {
     // Get upcoming deadlines for assignments
     const upcomingAssignments = await db
       .select({
@@ -439,11 +501,17 @@ export class DatabaseStorage implements IStorage {
       .orderBy(assignments.deadline)
       .limit(5);
     
-    return upcomingAssignments;
+    return upcomingAssignments.map((assignment) => ({
+      id: assignment.id,
+      title: assignment.title,
+      dueDate: formatDistance(new Date(assignment.deadline), new Date()),
+      unitCode: assignment.unitCode,
+      isCompleted: assignment.completed
+    }));
   }
   
   // Unit methods
-  async getAllUnits(userId: number): Promise<any[]> {
+  async getAllUnits(userId: number): Promise<Unit[]> {
     const allUnits = await db.select().from(units);
     
     // For each unit, calculate notification count
@@ -507,7 +575,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Notes methods
-  async getNotesByUnit(unitCode: string, userId: number): Promise<any[]> {
+  async getNotesByUnit(unitCode: string, userId: number): Promise<Note[]> {
     const unitNotes = await db
       .select({
         id: notes.id,
@@ -535,7 +603,7 @@ export class DatabaseStorage implements IStorage {
     return unitNotes;
   }
   
-  async createNote(data: InsertNote & { userId: number }): Promise<any> {
+  async createNote(data: InsertNote & { userId: number }): Promise<Note> {
     const [newNote] = await db
       .insert(notes)
       .values({
@@ -560,7 +628,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
   
-  async deleteNote(noteId: number, userId: number): Promise<any | null> {
+  async deleteNote(noteId: number, userId: number): Promise<Note | null> {
     // First verify that the note exists and belongs to the user
     const [note] = await db
       .select()
@@ -614,7 +682,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Assignment methods
-  async getAssignmentsByUnit(unitCode: string, userId: number): Promise<any[]> {
+  async getAssignmentsByUnit(unitCode: string, userId: number): Promise<Assignment[]> {
     const unitAssignments = await db
       .select({
         id: assignments.id,
@@ -643,7 +711,7 @@ export class DatabaseStorage implements IStorage {
     return unitAssignments;
   }
   
-  async createAssignment(data: InsertAssignment & { userId: number }): Promise<any> {
+  async createAssignment(data: InsertAssignment & { userId: number }): Promise<Assignment> {
     const [newAssignment] = await db
       .insert(assignments)
       .values({
@@ -668,7 +736,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
   
-  async deleteAssignment(assignmentId: number, userId: number): Promise<any | null> {
+  async deleteAssignment(assignmentId: number, userId: number): Promise<Assignment | null> {
     // First verify that the assignment exists and belongs to the user
     const [assignment] = await db
       .select()
@@ -698,7 +766,7 @@ export class DatabaseStorage implements IStorage {
     return deletedAssignment;
   }
   
-  async completeAssignment(assignmentId: number, userId: number): Promise<any> {
+  async completeAssignment(assignmentId: number, userId: number): Promise<Assignment> {
     // Check if already completed
     const [existingCompletion] = await db
       .select()
@@ -750,7 +818,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Past papers methods
-  async getPastPapersByUnit(unitCode: string, userId: number): Promise<any[]> {
+  async getPastPapersByUnit(unitCode: string, userId: number): Promise<PastPaper[]> {
     const unitPapers = await db
       .select({
         id: pastPapers.id,
@@ -779,7 +847,7 @@ export class DatabaseStorage implements IStorage {
     return unitPapers;
   }
   
-  async createPastPaper(data: InsertPastPaper & { userId: number }): Promise<any> {
+  async createPastPaper(data: InsertPastPaper & { userId: number }): Promise<PastPaper> {
     const [newPaper] = await db
       .insert(pastPapers)
       .values({
@@ -805,7 +873,7 @@ export class DatabaseStorage implements IStorage {
     };
   }
   
-  async deletePastPaper(paperId: number, userId: number): Promise<any | null> {
+  async deletePastPaper(paperId: number, userId: number): Promise<PastPaper | null> {
     // First verify that the paper exists and belongs to the user
     const [paper] = await db
       .select()
@@ -859,7 +927,12 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Ranking methods
-  async getUnitRankings(unitCode: string): Promise<any[]> {
+  async getUnitRankings(unitCode: string): Promise<{
+    userId: number;
+    name: string;
+    rank: number;
+    score: number;
+  }[]> {
     // Get all assignments for the unit
     const unitAssignments = await db
       .select()
@@ -973,11 +1046,21 @@ export class DatabaseStorage implements IStorage {
       ranking.overallRank = ranking.position;
     });
     
-    return rankings;
+    return rankings.map((ranking) => ({
+      userId: ranking.userId,
+      name: ranking.name,
+      rank: ranking.position,
+      score: ranking.totalMilliseconds
+    }));
   }
   
   // File methods
-  async getFileById(fileId: number): Promise<any> {
+  async getFileById(fileId: number): Promise<{
+    id: number;
+    name: string;
+    url: string;
+    type: string;
+  }> {
     try {
       // Import fileStorage schema on-demand to avoid circular dependency
       const { fileStorage } = await import("@shared/schema");
@@ -987,7 +1070,12 @@ export class DatabaseStorage implements IStorage {
         .from(fileStorage)
         .where(eq(fileStorage.id, fileId));
       
-      return file;
+      return {
+        id: file.id,
+        name: file.name,
+        url: file.url,
+        type: file.type
+      };
     } catch (error) {
       console.error('Error getting file by ID:', error);
       return null;
@@ -995,7 +1083,13 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Search methods
-  async searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<any[]> {
+  async searchContent(query: string, type?: string, unitCode?: string, userId?: number): Promise<{
+    id: number;
+    type: string;
+    title: string;
+    unitCode: string;
+    url?: string;
+  }[]> {
     try {
       // Use the specialized search module implementation
       const { searchContent } = await import('./search');
@@ -1007,7 +1101,7 @@ export class DatabaseStorage implements IStorage {
         unitCode: unitCode
       };
       
-      return await searchContent(searchParams, userId || 0);
+      return await searchContent(query, userId || 0, unitCode, type);
     } catch (error) {
       console.error('Error searching content:', error);
       return [];
