@@ -1,0 +1,14 @@
+{
+  "workflows": [
+    {
+      "name": "Start Student Tracker",
+      "run": "cd StudentPerformanceTracker006 && bash run.sh",
+      "description": "Run Student Performance Tracker application",
+      "restartOn": {
+        "fileChange": ["StudentPerformanceTracker006/**/*.js", "StudentPerformanceTracker006/**/*.ts", "StudentPerformanceTracker006/**/*.html"]
+      },
+      "waitForPort": 3000,
+      "visibility": "public"
+    }
+  ]
+}

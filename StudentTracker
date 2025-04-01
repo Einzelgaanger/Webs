@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-cd StudentPerformanceTracker006 && node app.cjs

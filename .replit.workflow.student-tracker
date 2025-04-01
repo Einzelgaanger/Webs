@@ -1,6 +1,9 @@
-[Student Tracker]
+run = "./start-tracker.sh"
+language = "nodejs"
+hidden = false
+compile = false
+guessImports = false
 onBoot = false
-restartOn = { filesChange = ["*"] }
-startCommand = ["./run.sh"]
-show = true
-persistent = true
+audio = false
+buildCommand = ""
+entrypoint = "start-tracker.sh"

@@ -1,0 +1,55 @@
+Node.js v22.12.0
+    at Array.map (<anonymous>)
+    at /opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:294:74
+    at parse (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:183:20)
+    at consume (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:152:29)
+    at Iter.text (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:128:30)
+    at Iter.tryConsume (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:112:28)
+    at Iter.peek (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:106:38)
+    at lexer.next (<anonymous>)
+    at lexer (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:91:27)
+    at name (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:73:19)
+TypeError: Missing parameter name at 1: https://git.new/pathToRegexpError
+            ^
+            throw new TypeError(`Missing parameter name at ${i}: ${DEBUG_URL}`);
+/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:73
+==> Running 'node StudentPerformanceTracker006/app.cjs'
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Exited with status 1
+Node.js v22.12.0
+    at Array.map (<anonymous>)
+    at /opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:294:74
+    at parse (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:183:20)
+    at consume (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:152:29)
+    at Iter.text (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:128:30)
+    at Iter.tryConsume (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:112:28)
+    at Iter.peek (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:106:38)
+    at lexer.next (<anonymous>)
+    at lexer (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:91:27)
+    at name (/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:73:19)
+TypeError: Missing parameter name at 1: https://git.new/pathToRegexpError
+            ^
+            throw new TypeError(`Missing parameter name at ${i}: ${DEBUG_URL}`);
+/opt/render/project/src/node_modules/router/node_modules/path-to-regexp/dist/index.js:73
+==> Running 'node StudentPerformanceTracker006/app.cjs'
+==> Deploying...
+==> Build successful 🎉
+==> Uploaded in 4.3s. Compression took 1.9s
+==> Uploading build...
+Run `npm audit` for details.
+  npm audit fix
+To address all issues, run:
+1 high severity vulnerability
+  run `npm fund` for details
+30 packages are looking for funding
+up to date, audited 242 packages in 1s
+==> Running build command 'npm install'...
+==> Docs on specifying a bun version: https://render.com/docs/bun-version
+==> Using Bun version 1.1.0 (default)
+==> Docs on specifying a Node.js version: https://render.com/docs/node-version
+==> Using Node.js version 22.12.0 (default)
+==> Transferred 103MB in 8s. Extraction took 2s.
+==> Downloading cache...
+==> Checking out commit ead5795d418fde0704673d2528d4a4b6596414c5 in branch main
+==> Cloning from https://github.com/Einzelgaanger/Webs
+==> It looks like we don't have access to your repo, but we'll try to clone it anyway.

@@ -252,8 +252,11 @@ export default function AuthPage() {
                       <FormItem>
                         <FormLabel>Admission Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="ADM123456" {...field} />
+                          <Input placeholder="e.g. 190093" {...field} />
                         </FormControl>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Use your actual admission number (e.g. 190093, not S001)
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -358,8 +361,11 @@ export default function AuthPage() {
                         <FormItem>
                           <FormLabel>Admission Number</FormLabel>
                           <FormControl>
-                            <Input placeholder="ADM123456" {...field} />
+                            <Input placeholder="e.g. 190093" {...field} />
                           </FormControl>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Use your actual admission number (e.g. 190093, not S001)
+                          </p>
                           <FormMessage />
                         </FormItem>
                       )}
