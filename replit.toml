@@ -1,2 +1,0 @@
-[StudentTracker]
-run = "cd StudentPerformanceTracker006 && node app.cjs"
