@@ -1,6 +1,7 @@
 /**
  * Simple Express server for Student Performance Tracker
  * This version doesn't rely on path-to-regexp which is causing issues
+ * Updated to use Supabase for storage
  */
 
 const express = require('express');
@@ -13,6 +14,7 @@ const LocalStrategy = require('passport-local').Strategy;
 const bcrypt = require('bcryptjs');
 const multer = require('multer');
 const apiRouter = require('./api');
+const storageHelper = require('./storage-helper');
 
 // Create Express app
 const app = express();
@@ -28,23 +30,9 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Middleware for profile image uploads
-const profileStorage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    const profileDir = path.join(UPLOADS_DIR, 'profiles');
-    if (!fs.existsSync(profileDir)) {
-      fs.mkdirSync(profileDir, { recursive: true });
-    }
-    cb(null, profileDir);
-  },
-  filename: function(req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `profile-${Date.now()}${ext}`);
-  }
-});
-
+// Middleware for profile image uploads (using memory storage for Supabase)
 const profileUpload = multer({ 
-  storage: profileStorage,
+  storage: multer.memoryStorage(), // Use memory storage for Supabase
   limits: { fileSize: 3 * 1024 * 1024 }, // 3MB limit
   fileFilter: function(req, file, cb) {
     // Accept images only
@@ -55,23 +43,9 @@ const profileUpload = multer({
   }
 });
 
-// Middleware for file uploads (assignments, notes, etc.)
-const fileStorage = multer.diskStorage({
-  destination: function(req, file, cb) {
-    const fileDir = path.join(UPLOADS_DIR, 'files');
-    if (!fs.existsSync(fileDir)) {
-      fs.mkdirSync(fileDir, { recursive: true });
-    }
-    cb(null, fileDir);
-  },
-  filename: function(req, file, cb) {
-    const ext = path.extname(file.originalname);
-    cb(null, `file-${Date.now()}${ext}`);
-  }
-});
-
+// Middleware for file uploads (assignments, notes, etc.) (using memory storage for Supabase)
 const fileUpload = multer({ 
-  storage: fileStorage,
+  storage: multer.memoryStorage(), // Use memory storage for Supabase
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: function(req, file, cb) {
     // Accept common document formats
@@ -291,14 +265,15 @@ app.post('/api/auth/update-password', ensureAuthenticated, async (req, res) => {
   }
 });
 
-// Update profile image route
+// Update profile image route - using Supabase storage
 app.post('/api/auth/update-profile-image', ensureAuthenticated, profileUpload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No image file provided' });
     }
     
-    const imageUrl = `/uploads/profiles/${path.basename(req.file.path)}`;
+    // Upload image to Supabase storage
+    const imageUrl = await storageHelper.uploadProfileImage(req.file);
     const userId = req.user.id;
     
     // Update profile image URL in database
@@ -506,10 +481,10 @@ app.post('/api/units/:unitCode/notes', ensureAuthenticated, fileUpload.single('f
       return res.status(400).json({ message: 'Title is required' });
     }
     
-    // Prepare file URL if uploaded
+    // Prepare file URL if uploaded - using Supabase storage
     let fileUrl = null;
     if (req.file) {
-      fileUrl = `/uploads/files/${path.basename(req.file.path)}`;
+      fileUrl = await storageHelper.uploadFile(req.file);
     }
     
     const client = await dbPool.connect();
@@ -615,10 +590,10 @@ app.post('/api/units/:unitCode/assignments', ensureAuthenticated, fileUpload.sin
       return res.status(400).json({ message: 'Title and due date are required' });
     }
     
-    // Prepare file URL if uploaded
+    // Prepare file URL if uploaded - using Supabase storage
     let fileUrl = null;
     if (req.file) {
-      fileUrl = `/uploads/files/${path.basename(req.file.path)}`;
+      fileUrl = await storageHelper.uploadFile(req.file);
     }
     
     const client = await dbPool.connect();
@@ -745,7 +720,8 @@ app.post('/api/units/:unitCode/past-papers', ensureAuthenticated, fileUpload.sin
       return res.status(400).json({ message: 'File upload is required for past papers' });
     }
     
-    const fileUrl = `/uploads/files/${path.basename(req.file.path)}`;
+    // Use Supabase storage for uploading files
+    const fileUrl = await storageHelper.uploadFile(req.file);
     
     const client = await dbPool.connect();
     

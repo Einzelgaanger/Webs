@@ -6,3 +6,6 @@ start = ["./start_app.sh"]
 [tools.run.commands]
 Start_Application = "./start_app.sh"
 
+[nix]
+channel = "stable-24_05"
+
