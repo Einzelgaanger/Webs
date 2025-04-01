@@ -36,6 +36,13 @@ interface CustomRequest extends Request {
   isAuthenticated(): boolean;
   user: {
     id: number;
+    name: string;
+    admissionNumber: string;
+    password: string;
+    profileImageUrl: string | null;
+    rank: number | null;
+    role: string | null;
+    createdAt: Date;
   };
 }
 
@@ -357,7 +364,7 @@ export function setupRoutes(app: Express) {
   });
 
   // Search routes
-  app.get("/api/search", async (req: CustomRequest, res: Response) => {
+  app.get("/api/search", (async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -372,9 +379,9 @@ export function setupRoutes(app: Express) {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
 
-  app.get("/api/search/suggestions", async (req: CustomRequest, res: Response) => {
+  app.get("/api/search/suggestions", (async (req: CustomRequest, res: Response) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
@@ -388,7 +395,7 @@ export function setupRoutes(app: Express) {
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });
     }
-  });
+  }) as RequestHandler);
   
   // File Serving route
   app.get("/api/files/:fileId", async (req, res) => {
@@ -425,11 +432,9 @@ export function setupRoutes(app: Express) {
     }
   });
 
-  // Update the file upload handler
+  // File upload handler
   app.post("/api/upload", fileUpload.single('file'), (async (req: CustomRequest, res: Response) => {
-    if (!req.session.isAuthenticated) {
-      return res.status(401).json({ message: 'Authentication required' });
-    }
+    if (!req.isAuthenticated()) return res.sendStatus(401);
     
     try {
       if (!req.file) {

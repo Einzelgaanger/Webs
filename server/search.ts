@@ -9,8 +9,9 @@ const { Pool } = pkg;
 import { Request, Response } from 'express';
 import { Session } from 'express-session';
 import { db } from './db';
-import { notes, assignments, pastPapers, units } from './schema';
+import { notes, assignments, pastPapers, units } from '@shared/schema';
 import { eq, like, or, and } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 
 interface CustomSession extends Session {
   isAuthenticated?: boolean;
@@ -59,15 +60,16 @@ export async function recordSearchQuery(userId: number, query: string, resultCou
  * Search for content across notes, assignments, and past papers
  * 
  * @param query Search query
+ * @param userId User ID
  * @param type Optional content type to filter by ('notes', 'assignments', 'papers')
  * @param unitCode Optional unit code to filter by
  * @param userId Optional user ID to filter by
  */
 export async function searchContent(
   query: string,
-  type?: string,
+  userId: number,
   unitCode?: string,
-  userId?: number
+  type?: string
 ): Promise<SearchResult[]> {
   try {
     let results: SearchResult[] = [];
@@ -82,11 +84,7 @@ export async function searchContent(
     ];
 
     if (unitCode) {
-      conditions.push(eq(units.code, unitCode));
-    }
-
-    if (userId) {
-      conditions.push(eq(notes.userId, userId));
+      conditions.push(eq(units.unitCode, unitCode));
     }
 
     // Search notes if no type specified or type is 'notes'
@@ -143,7 +141,7 @@ export async function searchContent(
     }
 
     // Record the search
-    await recordSearchQuery(userId || 0, query, results.length);
+    await recordSearchQuery(userId, query, results.length);
     
     return results;
   } catch (error) {
@@ -158,7 +156,7 @@ export async function searchContent(
  * @param query Partial search query
  * @param limit Maximum number of suggestions to return
  */
-export async function getSearchSuggestions(query: string, limit: number = 5): Promise<string[]> {
+export async function getSearchSuggestions(query: string): Promise<string[]> {
   try {
     const searchPattern = `${query.toLowerCase()}%`;
     
@@ -173,11 +171,11 @@ export async function getSearchSuggestions(query: string, limit: number = 5): Pr
         query
       ORDER BY 
         COUNT(id) DESC
-      LIMIT $2
+      LIMIT 5
     `;
     
-    const result = await pool.query(suggestionsQuery, [searchPattern, limit]);
-    return result.rows.map(row => row.query);
+    const result = await db.execute(sql.raw(suggestionsQuery, [searchPattern]));
+    return result.map(row => row.query);
   } catch (error) {
     console.error('Error getting search suggestions:', error);
     return [];
@@ -209,9 +207,9 @@ export async function handleSearch(req: CustomRequest, res: Response): Promise<R
     
     const results = await searchContent(
       query,
-      typeof contentType === 'string' ? contentType : undefined,
+      userId,
       typeof unitCode === 'string' ? unitCode : undefined,
-      userId
+      typeof contentType === 'string' ? contentType : undefined
     );
     
     return res.json({ results });
@@ -233,17 +231,13 @@ export async function handleSearchSuggestions(req: CustomRequest, res: Response)
       return res.status(401).json({ message: 'Authentication required' });
     }
     
-    const { query, limit } = req.query;
+    const { query } = req.query;
     
     if (!query || typeof query !== 'string') {
       return res.status(400).json({ message: 'Query parameter is required' });
     }
     
-    const suggestions = await getSearchSuggestions(
-      query,
-      typeof limit === 'string' ? parseInt(limit, 10) : 5
-    );
-    
+    const suggestions = await getSearchSuggestions(query);
     return res.json({ suggestions });
   } catch (error) {
     console.error('Search suggestions handler error:', error);

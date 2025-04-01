@@ -123,8 +123,32 @@ interface RecentActivity {
   id: number;
   title: string;
   type: 'note' | 'assignment' | 'past-paper';
+  timestamp: Date;
+}
+
+interface RecentCompletion {
+  id: number;
+  title: string;
   type: 'assignment' | 'note' | 'past-paper';
   timestamp: Date;
+}
+
+interface NoteWithMetadata extends Note {
+  uploadedBy: string;
+  uploaderImageUrl?: string;
+  viewed: boolean;
+}
+
+interface AssignmentWithMetadata extends Assignment {
+  uploadedBy: string;
+  completed: boolean;
+  completedAt?: Date;
+}
+
+interface PastPaperWithMetadata extends PastPaper {
+  uploadedBy: string;
+  uploaderImageUrl?: string;
+  viewed: boolean;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -592,7 +616,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Notes methods
-  async getNotesByUnit(unitCode: string, userId: number): Promise<Note[]> {
+  async getNotesByUnit(unitCode: string, userId: number): Promise<NoteWithMetadata[]> {
     const unitNotes = await db
       .select({
         id: notes.id,
@@ -699,7 +723,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Assignment methods
-  async getAssignmentsByUnit(unitCode: string, userId: number): Promise<Assignment[]> {
+  async getAssignmentsByUnit(unitCode: string, userId: number): Promise<AssignmentWithMetadata[]> {
     const unitAssignments = await db
       .select({
         id: assignments.id,
@@ -847,7 +871,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   // Past papers methods
-  async getPastPapersByUnit(unitCode: string, userId: number): Promise<PastPaper[]> {
+  async getPastPapersByUnit(unitCode: string, userId: number): Promise<PastPaperWithMetadata[]> {
     const unitPapers = await db
       .select({
         id: pastPapers.id,
@@ -1148,8 +1172,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentCompletions(userId: number): Promise<RecentCompletion[]> {
-    // ... existing code ...
-    return recentCompletions.map(completion => ({
+    const recentCompletions = await db
+      .select({
+        id: completedAssignments.id,
+        title: assignments.title,
+        type: sql<string>`'assignment'`.as('type'),
+        timestamp: completedAssignments.completedAt
+      })
+      .from(completedAssignments)
+      .innerJoin(assignments, eq(completedAssignments.assignmentId, assignments.id))
+      .where(eq(completedAssignments.userId, userId))
+      .orderBy(desc(completedAssignments.completedAt))
+      .limit(5);
+    
+    return recentCompletions.map((completion: { id: number; title: string; type: string; timestamp: Date }) => ({
       id: completion.id,
       title: completion.title,
       type: completion.type as 'assignment' | 'note' | 'past-paper',
