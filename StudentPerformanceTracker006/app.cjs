@@ -104,6 +104,11 @@ const upload = multer({
 // Serve static files from the uploads directory
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Serve static files from the dist directory 
+app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'client', 'public')));
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Authentication middleware
 const authenticate = (req, res, next) => {
   if (!req.session.isAuthenticated) {
@@ -517,6 +522,17 @@ async function initializeApp() {
     console.error('Database initialization error:', error);
   }
 }
+
+// Serve client app for all other routes (important - this must be after API routes)
+app.get('*', (req, res) => {
+  // Skip API paths
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ message: 'API endpoint not found' });
+  }
+  
+  // Serve index.html for all other routes
+  res.sendFile(path.join(__dirname, 'client', 'index.html'));
+});
 
 // Start the server
 app.listen(PORT, '0.0.0.0', async () => {

@@ -31,15 +31,15 @@ fi
 
 # 4. Run database setup script
 echo "Setting up database tables..."
-NODE_ENV=production node -e "
-  const { initializeDatabase } = require('./StudentPerformanceTracker006/server/init-db.js');
-  initializeDatabase().then(() => {
-    console.log('Database initialization complete');
-  }).catch(err => {
-    console.error('Database initialization failed:', err);
-    process.exit(1);
-  });
-"
+if [[ -f "StudentPerformanceTracker006/init-database.cjs" ]]; then
+  echo "Running init-database.cjs script..."
+  NODE_ENV=production node StudentPerformanceTracker006/init-database.cjs
+elif [[ -f "init-database.js" ]]; then
+  echo "Running init-database.js script..."
+  NODE_ENV=production node init-database.js
+else
+  echo "No database initialization script found. Proceeding without database setup."
+fi
 
 # 5. Set up required directories
 echo "Creating required directories..."
@@ -50,8 +50,11 @@ chmod -R 755 uploads
 
 # 6. Start the server
 echo "Starting the server..."
-if [[ -f "app.cjs" ]]; then
+if [[ -f "StudentPerformanceTracker006/app.cjs" ]]; then
   echo "Running the deployment-ready server (app.cjs)..."
+  node StudentPerformanceTracker006/app.cjs
+elif [[ -f "app.cjs" ]]; then
+  echo "Running the deployment-ready server (app.cjs) in root..."
   node app.cjs
 elif [[ -f "StudentPerformanceTracker006/app.js" ]]; then
   echo "Running the simple Express server..."
